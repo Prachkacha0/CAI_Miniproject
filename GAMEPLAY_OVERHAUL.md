@@ -63,13 +63,21 @@
 
 ### Focused Builder UI
 
-- เปลี่ยนหน้าเริ่มต้นของเว็บให้เข้าสู่ PC Build Lab โดยตรง แต่ยังเก็บเส้นทางบทเรียนเดิมไว้สำหรับลิงก์เก่า
-- หน้า Builder ใช้ Chrome แบบ Minimal และซ่อน Learning Center, Evidence และ AI Buddy ระหว่างประกอบ
+- PC Build Lab เข้าถึงได้จากหน้า Home และลิงก์ `#/builder` โดยตรง ขณะที่เส้นทางบทเรียนเดิมยังทำงานครบ
+- หน้า Builder ใช้พื้นที่เล่นแบบกระชับ ส่วน Learning Center, Evidence และ AI Buddy อยู่ใน Navigation/Overlay ที่เปิดเมื่อจำเป็น
 - ตัด Hero ขนาดใหญ่, Scenario Card 3 ใบ, Metrics 4 กล่อง, Build Sequence และ Diagnostics หลายรายการ
 - รวมโจทย์ งบ กำลังไฟ และสถานะ Compatibility เป็น HUD สั้นด้านบนและแถบสถานะด้านล่าง
 - ลด Layout จาก 3 คอลัมน์เหลือ 2 ส่วนหลัก: คลังอะไหล่และโต๊ะประกอบ
 - เอาถาดอะไหล่ 3D ที่ซ้ำกับคลังด้านซ้ายออก ลดทั้งความรกและจำนวนโมเดลที่ต้องเรนเดอร์
-- ซ่อนตัวเลือก 2D/3D ในภาวะปกติ โดยโหมด 2D ยังคงทำงานเป็น Fallback เมื่อ WebGL ล้มเหลว
+- ใช้สวิตช์ 2D/3D แบบย่อ และโหมด 2D ยังคงทำงานเป็น Fallback เมื่อ WebGL ล้มเหลว
+
+### Restored Legacy Features
+
+- คืนหน้า Home, Pre/Post Test, Mission 01–06, Final Case, Learning Center, Hardware Lab, Evidence, Progress, Reflection และ Certificate เป็นเส้นทางเริ่มต้นเดิม
+- คืน Navigation bar, Learning Center drawer, Evidence Board drawer และ AI Buddy ในหน้า Builder
+- คืนสวิตช์ `3D / 2D` เพื่อให้ผู้เล่นเลือกโหมดช่วยเล่นได้เอง
+- คืนข้อมูล Live Diagnostics และ Build Sequence ในแผงพับ `รายละเอียดระบบและลำดับประกอบ` เพื่อเก็บความสามารถเดิมโดยไม่เพิ่มความรกตลอดเวลา
+- งานโมเดล 3D, แอนิเมชันเฉพาะอุปกรณ์, Drag & Drop และ HUD แบบกระชับยังคงอยู่ทั้งหมด
 
 ### Model Detail Pass 2
 

@@ -160,8 +160,8 @@ export function PCBuilder() {
   }
 
   return (
-    <Shell title="PC BUILD LAB" subtitle="เลือก · ติดตั้ง · เปิดเครื่อง" wide minimal>
-      <div className="pc-builder-shell -mx-4 min-h-screen overflow-hidden bg-[#080d1a] text-white">
+    <Shell title="PC BUILD LAB" subtitle="เลือก · ติดตั้ง · เปิดเครื่อง" wide>
+      <div className="pc-builder-shell -mx-4 -mt-5 min-h-[calc(100vh-68px)] overflow-hidden bg-[#080d1a] text-white sm:rounded-b-[2.25rem]">
         <div className="flex max-w-full flex-wrap items-center gap-3 border-b border-white/10 bg-[#0c1424] px-4 py-3 sm:px-6">
           <div className="flex w-full min-w-0 items-center gap-3 sm:mr-auto sm:w-auto">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-400 text-slate-950"><Wrench className="h-5 w-5" /></span>
@@ -231,7 +231,13 @@ export function PCBuilder() {
                   <p className="text-xs font-bold tracking-[.18em] text-cyan-300">ASSEMBLY BAY 01</p>
                   <p className="mt-1 text-sm text-slate-400">{viewMode === '3d' ? 'มองผ่านสายตาช่าง หยิบอะไหล่ แล้วใช้มือประกอบลงเคส' : 'โหมดแผงควบคุมสำหรับคีย์บอร์ดและเครื่องที่ไม่มี WebGL'}</p>
                 </div>
-                <span className="hidden rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-300 ring-1 ring-white/10 sm:inline-flex">ติดตั้งแล้ว {installed}/8</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-xl bg-black/30 p-1 ring-1 ring-white/10" aria-label="เลือกรูปแบบโต๊ะประกอบ">
+                    <button disabled={sceneBusy} onClick={() => changeViewMode('3d')} aria-pressed={viewMode === '3d'} className={cx('min-h-10 cursor-pointer rounded-lg px-3 text-xs font-bold transition disabled:opacity-40', viewMode === '3d' ? 'bg-cyan-400 text-slate-950' : 'text-slate-400 hover:text-white')}>3D</button>
+                    <button disabled={sceneBusy} onClick={() => changeViewMode('2d')} aria-pressed={viewMode === '2d'} className={cx('min-h-10 cursor-pointer rounded-lg px-3 text-xs font-bold transition disabled:opacity-40', viewMode === '2d' ? 'bg-white text-slate-950' : 'text-slate-400 hover:text-white')}>2D</button>
+                  </div>
+                  <span className="hidden rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-300 ring-1 ring-white/10 sm:inline-flex">ติดตั้งแล้ว {installed}/8</span>
+                </div>
               </div>
 
               {viewMode === '3d' ? (
@@ -281,6 +287,13 @@ export function PCBuilder() {
               </div>
               <button onClick={tryBoot} disabled={boot === 'checking' || sceneBusy} className={cx('group flex min-h-14 min-w-52 cursor-pointer items-center justify-between gap-4 rounded-2xl border px-5 text-left transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50', blocks.length ? 'border-rose-400/30 bg-rose-500/15 hover:bg-rose-500/25' : 'border-emerald-300/40 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 hover:brightness-110')}><span className="flex items-center gap-2"><Power className="h-6 w-6" /><b>POWER ON</b></span><ChevronRight className="h-5 w-5" /></button>
             </div>
+            <details className="group mt-3 rounded-2xl border border-white/10 bg-white/[.03]">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-bold text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">รายละเอียดระบบและลำดับประกอบ <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" /></summary>
+              <div className="grid gap-4 border-t border-white/10 p-4 sm:grid-cols-2">
+                <div><p className="mb-2 text-xs font-bold tracking-wider text-amber-300">LIVE DIAGNOSTICS</p><div className="space-y-2">{issues.slice(0, 6).map((issue) => <div key={issue.id} className={cx('rounded-xl border p-3', issue.severity === 'block' ? 'border-rose-400/25 bg-rose-400/10' : issue.severity === 'warn' ? 'border-amber-300/20 bg-amber-300/[.08]' : 'border-emerald-400/20 bg-emerald-400/[.08]')}><b className="text-sm">{issue.title}</b><p className="text-xs text-slate-400">{issue.detail}</p></div>)}</div></div>
+                <div><p className="mb-2 text-xs font-bold tracking-wider text-violet-300">BUILD SEQUENCE</p><ol className="space-y-2">{CATEGORY_ORDER.map((item, index) => <li key={item} className="flex items-center gap-2 text-sm"><span className={cx('grid h-7 w-7 place-items-center rounded-lg text-xs font-bold', build[item] ? 'bg-emerald-400 text-emerald-950' : 'bg-white/5 text-slate-500')}>{build[item] ? <Check className="h-4 w-4" /> : index + 1}</span><span className={build[item] ? 'text-white' : 'text-slate-500'}>{CATEGORY_LABELS[item].th}</span>{build[item] && <span className="ml-auto truncate text-xs text-slate-400">{build[item]?.name}</span>}</li>)}</ol></div>
+              </div>
+            </details>
           </section>
         </div>
       </div>

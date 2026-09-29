@@ -59,7 +59,7 @@ function BuddyWidget() {
   // Reset the opened level when the topic changes (new step).
   useEffect(() => setLevel(null), [t]);
 
-  if (route.name === 'start' || route.name === 'certificate' || route.name === 'builder') return null;
+  if (route.name === 'start' || route.name === 'certificate') return null;
 
   const reveal = (l: Level) => {
     if (level !== l) {

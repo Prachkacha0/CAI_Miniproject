@@ -110,9 +110,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(() => {
     const s = load();
     const hashRoute = window.location.hash ? hashToRoute(window.location.hash) : null;
-    if (!window.location.hash) return { name: 'builder' };
     if (!s.player && hashRoute?.name !== 'builder') return { name: 'start' };
-    return hashRoute ?? { name: 'builder' };
+    return hashRoute ?? { name: 'home' };
   });
 
   useEffect(() => {
