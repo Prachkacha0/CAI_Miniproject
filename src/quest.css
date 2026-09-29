@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Kanit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Chakra Petch", "Kanit", ui-sans-serif, sans-serif;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, #e0e7ff 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 110% 10%, #cffafe 0%, transparent 60%),
+    #f6f7fb;
+  color: #0f172a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body { background: #fff; }
+  header { display: none !important; }
+  .certificate { box-shadow: none !important; }
+}
+
+.builder-button {
+  display: inline-flex;
+  min-height: 44px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-width: 1px;
+  border-radius: 1rem;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: background-color 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+
+.builder-button:active {
+  transform: translateY(1px);
+}
+
+.builder-button:focus-visible {
+  outline: 2px solid #67e8f9;
+  outline-offset: 2px;
+}
+
+.pc-builder-shell button:not(:disabled) {
+  cursor: pointer;
+}

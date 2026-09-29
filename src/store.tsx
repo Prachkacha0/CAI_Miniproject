@@ -1,0 +1,284 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TestResult } from './types';
+import { PASS_RATIO } from './data/assessment';
+import { MISSIONS } from './data/missions';
+
+const KEY = 'hardware-quest.v1';
+const MISSION_IDS: MissionId[] = [1, 2, 3, 4, 5, 6];
+
+function freshState(): GameState {
+  return {
+    version: 1,
+    player: null,
+    preTest: null,
+    postTest: null,
+    postTestBest: null,
+    missions: Object.fromEntries(MISSION_IDS.map((id) => [id, { completed: false, plays: 0, hintsUsed: 0 }])) as GameState['missions'],
+    finalCase: { completed: false },
+    reflection: null,
+    evidence: [],
+    buddyUses: 0,
+    labViewed: [],
+    learnViewed: [],
+    certificate: null,
+  };
+}
+
+function load(): GameState {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return freshState();
+    const parsed = JSON.parse(raw) as GameState;
+    if (parsed?.version !== 1) return freshState();
+    return { ...freshState(), ...parsed };
+  } catch {
+    return freshState();
+  }
+}
+
+export const avgScore = (s?: MissionScore) =>
+  s ? Math.round((s.accuracy + s.investigation + s.reasoning + s.independence) / 4) : 0;
+
+const better = (a: MissionScore | undefined, b: MissionScore) => (!a || avgScore(b) >= avgScore(a) ? b : a);
+
+export const testPassed = (t: TestResult | null) => !!t && t.score / t.total >= PASS_RATIO;
+
+// ---------- Routing (hash based so browser Back works) ----------
+export type Route =
+  | { name: 'start' }
+  | { name: 'pretest' }
+  | { name: 'home' }
+  | { name: 'map' }
+  | { name: 'mission'; id: MissionId }
+  | { name: 'final' }
+  | { name: 'learn'; hw?: string }
+  | { name: 'lab' }
+  | { name: 'builder' }
+  | { name: 'evidence' }
+  | { name: 'progress' }
+  | { name: 'posttest' }
+  | { name: 'reflection' }
+  | { name: 'certificate' };
+
+export function routeToHash(r: Route): string {
+  switch (r.name) {
+    case 'mission': return `#/mission/${r.id}`;
+    case 'learn': return r.hw ? `#/learn/${r.hw}` : '#/learn';
+    default: return `#/${r.name}`;
+  }
+}
+
+function hashToRoute(hash: string): Route {
+  const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  const [head, arg] = parts;
+  if (head === 'mission') {
+    const id = Number(arg);
+    if (id >= 1 && id <= 6) return { name: 'mission', id: id as MissionId };
+    return { name: 'map' };
+  }
+  if (head === 'learn') return { name: 'learn', hw: arg };
+  const simple = ['start', 'pretest', 'home', 'map', 'final', 'lab', 'builder', 'evidence', 'progress', 'posttest', 'reflection', 'certificate'];
+  if (head && simple.includes(head)) return { name: head } as Route;
+  return { name: 'home' };
+}
+
+// ---------- Context ----------
+interface Store {
+  state: GameState;
+  route: Route;
+  go: (r: Route) => void;
+  back: () => void;
+  setPlayer: (name: string, group: string) => void;
+  savePreTest: (t: TestResult) => void;
+  savePostTest: (t: TestResult) => void;
+  completeMission: (id: MissionId, score: MissionScore, meta?: Record<string, unknown>) => void;
+  addHint: (id: MissionId | 'final') => void;
+  addEvidence: (e: Omit<Evidence, 'at'>) => boolean;
+  completeFinal: (rec: Omit<FinalCaseRecord, 'completed' | 'at'>) => void;
+  saveReflection: (r: Omit<ReflectionData, 'at'>) => void;
+  markLab: (id: string) => void;
+  markLearn: (id: string) => void;
+  noteBuddy: () => void;
+  issueCertificate: () => void;
+  reset: () => void;
+}
+
+const Ctx = createContext<Store | null>(null);
+
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<GameState>(load);
+  const [route, setRoute] = useState<Route>(() => {
+    const s = load();
+    const hashRoute = window.location.hash ? hashToRoute(window.location.hash) : null;
+    if (!window.location.hash) return { name: 'builder' };
+    if (!s.player && hashRoute?.name !== 'builder') return { name: 'start' };
+    return hashRoute ?? { name: 'builder' };
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    } catch {
+      /* storage unavailable: game still works for this session */
+    }
+  }, [state]);
+
+  useEffect(() => {
+    const onHash = () => setRoute(hashToRoute(window.location.hash));
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [route]);
+
+  const go = useCallback((r: Route) => {
+    const h = routeToHash(r);
+    if (window.location.hash === h) setRoute(r);
+    else window.location.hash = h;
+  }, []);
+
+  const back = useCallback(() => {
+    if (window.history.length > 1) window.history.back();
+    else go({ name: 'home' });
+  }, [go]);
+
+  const patch = useCallback((fn: (s: GameState) => GameState) => setState((s) => fn(s)), []);
+
+  const store = useMemo<Store>(() => ({
+    state,
+    route,
+    go,
+    back,
+    setPlayer: (name, group) => patch((s) => ({ ...s, player: { name, group } })),
+    savePreTest: (t) => patch((s) => ({ ...s, preTest: t })),
+    savePostTest: (t) => patch((s) => ({
+      ...s,
+      postTest: t,
+      postTestBest: !s.postTestBest || t.score >= s.postTestBest.score ? t : s.postTestBest,
+    })),
+    completeMission: (id, score, meta) => patch((s) => {
+      const m = s.missions[id];
+      return {
+        ...s,
+        missions: { ...s.missions, [id]: { ...m, completed: true, plays: m.plays + 1, best: better(m.best, score), meta: { ...m.meta, ...meta } } },
+      };
+    }),
+    addHint: (id) => patch((s) => {
+      if (id === 'final') return { ...s, buddyUses: s.buddyUses + 1 };
+      return { ...s, missions: { ...s.missions, [id]: { ...s.missions[id], hintsUsed: s.missions[id].hintsUsed + 1 } } };
+    }),
+    addEvidence: (e) => {
+      const exists = state.evidence.some((x) => x.id === e.id);
+      if (!exists) patch((s) => (s.evidence.some((x) => x.id === e.id) ? s : { ...s, evidence: [...s.evidence, { ...e, at: Date.now() }] }));
+      return !exists;
+    },
+    completeFinal: (rec) => patch((s) => ({ ...s, finalCase: { ...rec, completed: true, at: Date.now() } })),
+    saveReflection: (r) => patch((s) => ({ ...s, reflection: { ...r, at: Date.now() } })),
+    markLab: (id) => patch((s) => (s.labViewed.includes(id) ? s : { ...s, labViewed: [...s.labViewed, id] })),
+    markLearn: (id) => patch((s) => (s.learnViewed.includes(id) ? s : { ...s, learnViewed: [...s.learnViewed, id] })),
+    noteBuddy: () => patch((s) => ({ ...s, buddyUses: s.buddyUses + 1 })),
+    issueCertificate: () => patch((s) => (s.certificate ? s : { ...s, certificate: { id: makeCertId(s), at: Date.now() } })),
+    reset: () => {
+      setState(freshState());
+      try { localStorage.removeItem('hardware-quest.builder.v1'); } catch { /* Ignore unavailable storage. */ }
+      window.location.hash = '#/start';
+    },
+  }), [state, route, go, back, patch]);
+
+  return <Ctx.Provider value={store}>{children}</Ctx.Provider>;
+}
+
+export function useStore() {
+  const s = useContext(Ctx);
+  if (!s) throw new Error('useStore outside StoreProvider');
+  return s;
+}
+
+function makeCertId(s: GameState) {
+  const seed = `${s.player?.name ?? ''}|${s.player?.group ?? ''}|${Date.now()}`;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  const code = (h >>> 0).toString(36).toUpperCase().padStart(7, '0').slice(-7);
+  return `HQ-${new Date().getFullYear()}-${code}`;
+}
+
+// ---------- Derived selectors ----------
+export type MissionStatus = 'locked' | 'available' | 'completed';
+
+export function missionStatus(s: GameState, id: MissionId): MissionStatus {
+  if (s.missions[id].completed) return 'completed';
+  if (id === 1 || s.missions[(id - 1) as MissionId].completed) return 'available';
+  return 'locked';
+}
+
+export const allMissionsDone = (s: GameState) => MISSION_IDS.every((id) => s.missions[id].completed);
+
+export function currentStep(s: GameState): { label: string; route: Route } {
+  if (!s.preTest) return { label: 'ทำ Pre-Test', route: { name: 'pretest' } };
+  const next = MISSIONS.find((m) => !s.missions[m.id].completed);
+  if (next) return { label: `${next.code} ${next.title}`, route: { name: 'mission', id: next.id } };
+  if (!s.finalCase.completed) return { label: 'Final Case: กู้ระบบห้องทะเบียน', route: { name: 'final' } };
+  if (!testPassed(s.postTestBest)) return { label: 'Post-Test', route: { name: 'posttest' } };
+  if (!s.reflection) return { label: 'Reflection', route: { name: 'reflection' } };
+  return { label: 'รับ Certificate', route: { name: 'certificate' } };
+}
+
+export function certRequirements(s: GameState) {
+  return [
+    ...MISSIONS.map((m) => ({ label: `Mission ${String(m.id).padStart(2, '0')} Completed`, done: s.missions[m.id].completed })),
+    { label: 'Final Case Completed', done: s.finalCase.completed },
+    { label: 'Post-Test Passed', done: testPassed(s.postTestBest) },
+    { label: 'Reflection Completed', done: !!s.reflection },
+  ];
+}
+
+export const certUnlocked = (s: GameState) => certRequirements(s).every((r) => r.done);
+
+export type LOStatus = 'not-started' | 'practiced' | 'achieved';
+
+/** Per-objective status from this player's own play data (not research data). */
+export function loStatus(s: GameState, lo: LOId): { status: LOStatus; pct: number } {
+  const practiced = s.missions[lo as MissionId].completed;
+  const post = s.postTestBest?.byLO[lo];
+  const postPct = post ? post.correct / post.total : 0;
+  if (practiced && post && postPct >= 0.5) return { status: 'achieved', pct: 100 };
+  if (practiced) return { status: 'practiced', pct: post ? 50 + Math.round(postPct * 50) : 60 };
+  return { status: 'not-started', pct: 0 };
+}
+
+export function earnedBadges(s: GameState): string[] {
+  const out: string[] = [];
+  if (s.evidence.length >= 25) out.push('evidence-hunter');
+  if (s.missions[4].completed && s.missions[4].hintsUsed <= 1) out.push('hardware-analyst');
+  if (s.finalCase.completed) out.push('system-fixer');
+  if (s.missions[6].meta?.allFit) out.push('hardware-planner');
+  if (s.certificate) out.push('system-technician');
+  return out;
+}
+
+export function technicianProfile(s: GameState) {
+  const scores = [...MISSION_IDS.map((id) => s.missions[id].best), s.finalCase.score].filter(Boolean) as MissionScore[];
+  const avg = (k: keyof MissionScore) => (scores.length ? Math.round(scores.reduce((a, x) => a + x[k], 0) / scores.length) : 0);
+  const selfLearning = Math.min(100, 40 + s.learnViewed.length * 6 + s.labViewed.length * 6 + (s.reflection ? 15 : 0));
+  return [
+    { key: 'Investigation', th: 'การสืบสวน', value: avg('investigation') },
+    { key: 'Hardware Knowledge', th: 'ความรู้ Hardware', value: Math.round((avg('accuracy') + (s.postTestBest ? (s.postTestBest.score / s.postTestBest.total) * 100 : 0)) / (s.postTestBest ? 2 : 1)) },
+    { key: 'Problem Solving', th: 'การแก้ปัญหา', value: avg('reasoning') },
+    { key: 'Self Learning', th: 'การเรียนรู้ด้วยตนเอง', value: selfLearning },
+  ];
+}
+
+export function gradeTest(questions: { lo: LOId; answer: number }[], answers: number[]): TestResult {
+  const byLO = { 1: { correct: 0, total: 0 }, 2: { correct: 0, total: 0 }, 3: { correct: 0, total: 0 }, 4: { correct: 0, total: 0 }, 5: { correct: 0, total: 0 }, 6: { correct: 0, total: 0 } } as TestResult['byLO'];
+  let score = 0;
+  questions.forEach((q, i) => {
+    byLO[q.lo].total++;
+    if (answers[i] === q.answer) {
+      byLO[q.lo].correct++;
+      score++;
+    }
+  });
+  return { score, total: questions.length, byLO, answers, at: Date.now() };
+}
