@@ -1,15 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TestResult } from './types';
+import type { Classroom, Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TestResult, UserRole } from './types';
 import { PASS_RATIO } from './data/assessment';
 import { MISSIONS } from './data/missions';
+import { classroomFinalAllowed, classroomLockReason, classroomMissionAllowed, hashStaffPin, normalizeClassroomCode } from './game/classroom';
 
 const KEY = 'hardware-quest.v1';
+const SESSION_KEY = 'hardware-quest.session.v1';
 const MISSION_IDS: MissionId[] = [1, 2, 3, 4, 5, 6];
 
 function freshState(): GameState {
   return {
     version: 1,
     player: null,
+    classrooms: {},
+    adminPinHash: null,
+    teacherPinHash: null,
     preTest: null,
     postTest: null,
     postTestBest: null,
@@ -30,7 +35,20 @@ function load(): GameState {
     if (!raw) return freshState();
     const parsed = JSON.parse(raw) as GameState;
     if (parsed?.version !== 1) return freshState();
-    return { ...freshState(), ...parsed };
+    const base = freshState();
+    let sessionPlayer: GameState['player'] = null;
+    try {
+      const sessionRaw = sessionStorage.getItem(SESSION_KEY);
+      sessionPlayer = sessionRaw ? JSON.parse(sessionRaw) as GameState['player'] : null;
+    } catch {
+      try { sessionStorage.removeItem(SESSION_KEY); } catch { /* Ignore unavailable session storage. */ }
+    }
+    const legacyPlayer = sessionPlayer ?? parsed.player as GameState['player'] | ({ name: string; group: string; role?: UserRole; classroomCode?: string }) | null;
+    const player = legacyPlayer ? { ...legacyPlayer, role: legacyPlayer.role ?? 'student', classroomCode: legacyPlayer.classroomCode ? normalizeClassroomCode(legacyPlayer.classroomCode) : undefined } : null;
+    if (!sessionPlayer && player) {
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(player)); } catch { /* Continue with in-memory migration. */ }
+    }
+    return { ...base, ...parsed, player, classrooms: parsed.classrooms ?? {}, missions: { ...base.missions, ...parsed.missions } };
   } catch {
     return freshState();
   }
@@ -49,6 +67,7 @@ export type Route =
   | { name: 'pretest' }
   | { name: 'home' }
   | { name: 'account' }
+  | { name: 'classroom' }
   | { name: 'mission'; id: MissionId }
   | { name: 'final' }
   | { name: 'learn'; hw?: string }
@@ -78,7 +97,7 @@ function hashToRoute(hash: string): Route {
   }
   if (head === 'learn') return { name: 'learn', hw: arg };
   if (head === 'map') return { name: 'home' };
-  const simple = ['start', 'pretest', 'home', 'account', 'final', 'lab', 'builder', 'evidence', 'progress', 'posttest', 'reflection', 'certificate'];
+  const simple = ['start', 'pretest', 'home', 'account', 'classroom', 'final', 'lab', 'builder', 'evidence', 'progress', 'posttest', 'reflection', 'certificate'];
   if (head && simple.includes(head)) return { name: head } as Route;
   return { name: 'home' };
 }
@@ -89,7 +108,12 @@ interface Store {
   route: Route;
   go: (r: Route) => void;
   back: () => void;
-  setPlayer: (name: string, group: string) => void;
+  setPlayer: (name: string, group: string, role: UserRole, classroomCode?: string) => void;
+  setInitialAdminPin: (pin: string) => void;
+  setTeacherPin: (pin: string) => void;
+  signOut: () => void;
+  createClassroom: (name: string, preferredCode?: string) => string;
+  updateClassroom: (code: string, update: Partial<Pick<Classroom, 'unlockedThrough' | 'finalUnlocked' | 'active' | 'name'>>) => void;
   savePreTest: (t: TestResult) => void;
   savePostTest: (t: TestResult) => void;
   completeMission: (id: MissionId, score: MissionScore, meta?: Record<string, unknown>) => void;
@@ -111,13 +135,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(() => {
     const s = load();
     const hashRoute = window.location.hash ? hashToRoute(window.location.hash) : null;
-    if (!s.player && hashRoute?.name !== 'builder') return { name: 'start' };
+    if (!s.player) return { name: 'start' };
     return hashRoute ?? { name: 'home' };
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem(KEY, JSON.stringify(state));
+      localStorage.setItem(KEY, JSON.stringify({ ...state, player: null }));
     } catch {
       /* storage unavailable: game still works for this session */
     }
@@ -127,6 +151,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const onHash = () => setRoute(hashToRoute(window.location.hash));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === KEY) setState(load());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   useEffect(() => {
@@ -151,7 +183,52 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     route,
     go,
     back,
-    setPlayer: (name, group) => patch((s) => ({ ...s, player: { name, group } })),
+    setPlayer: (name, group, role, rawClassroomCode) => {
+      const classroomCode = rawClassroomCode ? normalizeClassroomCode(rawClassroomCode) : undefined;
+      const room = classroomCode ? state.classrooms[classroomCode] : undefined;
+      const player = { name, group: room?.name ?? group, role, classroomCode };
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(player)); } catch { /* Session still works in memory. */ }
+      patch((s) => {
+        const currentRoom = classroomCode ? s.classrooms[classroomCode] : undefined;
+        if (!currentRoom || role !== 'student' || currentRoom.members.includes(name)) return { ...s, player };
+        return { ...s, player, classrooms: { ...s.classrooms, [classroomCode!]: { ...currentRoom, members: [...currentRoom.members, name], updatedAt: Date.now() } } };
+      });
+    },
+    setInitialAdminPin: (pin) => patch((s) => (s.adminPinHash ? s : { ...s, adminPinHash: hashStaffPin(pin) })),
+    setTeacherPin: (pin) => patch((s) => (s.player?.role === 'admin' ? { ...s, teacherPinHash: hashStaffPin(pin) } : s)),
+    signOut: () => {
+      try { sessionStorage.removeItem(SESSION_KEY); } catch { /* Ignore unavailable storage. */ }
+      if (state.player?.role === 'student') {
+        setState((s) => ({ ...freshState(), classrooms: s.classrooms, adminPinHash: s.adminPinHash, teacherPinHash: s.teacherPinHash }));
+        try { localStorage.removeItem('hardware-quest.builder.v1'); } catch { /* Ignore unavailable storage. */ }
+      } else {
+        patch((s) => ({ ...s, player: null }));
+      }
+      window.location.hash = '#/start';
+    },
+    createClassroom: (name, preferredCode) => {
+      let code = normalizeClassroomCode(preferredCode ?? '');
+      if (!code) {
+        do { code = `HQ-${Math.random().toString(36).slice(2, 7).toUpperCase()}`; } while (state.classrooms[code]);
+      }
+      patch((s) => {
+        if (s.classrooms[code]) return s;
+        const room: Classroom = { code, name, teacherName: s.player?.name ?? 'ผู้ดูแล', unlockedThrough: 1, finalUnlocked: false, active: true, members: [], updatedAt: Date.now() };
+        return { ...s, classrooms: { ...s.classrooms, [code]: room }, player: s.player ? { ...s.player, classroomCode: code, group: name } : s.player };
+      });
+      if (state.player) {
+        const updatedPlayer = { ...state.player, classroomCode: code, group: name };
+        try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(updatedPlayer)); } catch { /* Session still works in memory. */ }
+      }
+      return code;
+    },
+    updateClassroom: (rawCode, update) => patch((s) => {
+      const code = normalizeClassroomCode(rawCode);
+      const room = s.classrooms[code];
+      if (!room || !s.player || (s.player.role !== 'admin' && (s.player.role !== 'teacher' || room.teacherName !== s.player.name))) return s;
+      const unlockedThrough = update.unlockedThrough === undefined ? room.unlockedThrough : Math.max(0, Math.min(6, Math.round(update.unlockedThrough)));
+      return { ...s, classrooms: { ...s.classrooms, [code]: { ...room, ...update, unlockedThrough, finalUnlocked: unlockedThrough < 6 ? false : (update.finalUnlocked ?? room.finalUnlocked), updatedAt: Date.now() } } };
+    }),
     savePreTest: (t) => patch((s) => ({ ...s, preTest: t })),
     savePostTest: (t) => patch((s) => ({
       ...s,
@@ -182,6 +259,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     issueCertificate: () => patch((s) => (s.certificate ? s : { ...s, certificate: { id: makeCertId(s), at: Date.now() } })),
     reset: () => {
       setState(freshState());
+      try { sessionStorage.removeItem(SESSION_KEY); } catch { /* Ignore unavailable storage. */ }
       try { localStorage.removeItem('hardware-quest.builder.v1'); } catch { /* Ignore unavailable storage. */ }
       window.location.hash = '#/start';
     },
@@ -208,18 +286,23 @@ function makeCertId(s: GameState) {
 export type MissionStatus = 'locked' | 'available' | 'completed';
 
 export function missionStatus(s: GameState, id: MissionId): MissionStatus {
-  if (s.missions[id].completed) return 'completed';
-  if (id === 1 || s.missions[(id - 1) as MissionId].completed) return 'available';
-  return 'locked';
+  if (!classroomMissionAllowed(s, id)) return 'locked';
+  return s.missions[id].completed ? 'completed' : 'available';
 }
+
+export const canAccessFinal = (s: GameState) => classroomFinalAllowed(s);
+export { classroomLockReason };
 
 export const allMissionsDone = (s: GameState) => MISSION_IDS.every((id) => s.missions[id].completed);
 
-export function currentStep(s: GameState): { label: string; route: Route } {
+export function currentStep(s: GameState): { label: string; route: Route; blocked?: boolean } {
   if (!s.preTest) return { label: 'ทำ Pre-Test', route: { name: 'pretest' } };
-  const next = MISSIONS.find((m) => !s.missions[m.id].completed);
+  const next = MISSIONS.find((m) => !s.missions[m.id].completed && missionStatus(s, m.id) === 'available');
   if (next) return { label: `${next.code} ${next.title}`, route: { name: 'mission', id: next.id } };
-  if (!s.finalCase.completed) return { label: 'Final Case: กู้ระบบห้องทะเบียน', route: { name: 'final' } };
+  const remaining = MISSIONS.find((m) => !s.missions[m.id].completed);
+  if (remaining) return { label: classroomLockReason(s, remaining.id), route: { name: 'home' }, blocked: true };
+  if (!s.finalCase.completed && canAccessFinal(s)) return { label: 'Final Case: กู้ระบบห้องทะเบียน', route: { name: 'final' } };
+  if (!s.finalCase.completed) return { label: classroomLockReason(s), route: { name: 'home' }, blocked: true };
   if (!testPassed(s.postTestBest)) return { label: 'Post-Test', route: { name: 'posttest' } };
   if (!s.reflection) return { label: 'Reflection', route: { name: 'reflection' } };
   return { label: 'เปิดบัญชีเพื่อรับใบประกาศ', route: { name: 'account' } };

@@ -4,6 +4,26 @@ export type LOId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type MissionId = 1 | 2 | 3 | 4 | 5 | 6;
 
+export type UserRole = 'student' | 'teacher' | 'admin';
+
+export interface PlayerProfile {
+  name: string;
+  group: string;
+  role: UserRole;
+  classroomCode?: string;
+}
+
+export interface Classroom {
+  code: string;
+  name: string;
+  teacherName: string;
+  unlockedThrough: number;
+  finalUnlocked: boolean;
+  active: boolean;
+  members: string[];
+  updatedAt: number;
+}
+
 export interface HardwareItem {
   id: string;
   name: string; // Thai display name
@@ -70,7 +90,10 @@ export interface FinalCaseRecord {
 
 export interface GameState {
   version: 1;
-  player: { name: string; group: string } | null;
+  player: PlayerProfile | null;
+  classrooms: Record<string, Classroom>;
+  adminPinHash: string | null;
+  teacherPinHash: string | null;
   preTest: TestResult | null;
   postTest: TestResult | null; // latest attempt
   postTestBest: TestResult | null;

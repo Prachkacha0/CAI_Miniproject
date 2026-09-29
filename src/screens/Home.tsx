@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
-import { BookOpen, ChartColumnBig, Check, ClipboardList, Cpu, FlaskConical, FolderOpen, Lock, NotebookPen, Play, RotateCcw, ShieldCheck, Sparkles, UserRound, Wrench } from 'lucide-react';
-import { allMissionsDone, currentStep, missionStatus, testPassed, useStore, type Route } from '../store';
+import { BookOpen, ChartColumnBig, Check, ClipboardList, Cpu, FlaskConical, FolderOpen, Lock, NotebookPen, Play, RotateCcw, School, ShieldCheck, Sparkles, UserRound, Wrench } from 'lucide-react';
+import { canAccessFinal, currentStep, missionStatus, testPassed, useStore, type Route } from '../store';
+import { activeClassroom } from '../game/classroom';
 import { MISSIONS } from '../data/missions';
 import { Bar, Btn, Card, cx } from '../components/ui';
 import { Shell } from '../components/Shell';
@@ -11,6 +12,7 @@ export function Home() {
   const { state, go, reset } = useStore();
   const done = MISSIONS.filter((m) => state.missions[m.id].completed).length;
   const step = currentStep(state);
+  const classroom = activeClassroom(state);
 
   useBuddyTopic(
     {
@@ -56,10 +58,10 @@ export function Home() {
                     </div>
                   );
                 })}
-                <div className={cx('grid h-9 flex-1 place-items-center rounded-xl text-[10px] font-bold', state.finalCase.completed ? 'bg-emerald-400 text-emerald-950' : allMissionsDone(state) ? 'bg-rose-400 text-white' : 'bg-white/10 text-indigo-200')}>FINAL</div>
+                <div className={cx('grid h-9 flex-1 place-items-center rounded-xl text-[10px] font-bold', state.finalCase.completed ? 'bg-emerald-400 text-emerald-950' : canAccessFinal(state) ? 'bg-rose-400 text-white' : 'bg-white/10 text-indigo-200')}>FINAL</div>
               </div>
             </div>
-            <Btn onClick={() => go(step.route)} className="mt-6 bg-gradient-to-r from-cyan-400 to-emerald-400 text-lg text-slate-900 shadow-cyan-500/30">
+            <Btn onClick={() => go(step.route)} disabled={step.blocked} className="mt-6 bg-gradient-to-r from-cyan-400 to-emerald-400 text-lg text-slate-900 shadow-cyan-500/30">
               <Play className="h-5 w-5" aria-hidden="true" /> Continue Mission
             </Btn>
           </div>
@@ -82,6 +84,10 @@ export function Home() {
           </dl>
           <Btn onClick={() => go({ name: 'account' })} variant="secondary" className="mt-4 w-full"><UserRound className="h-4 w-4" /> เปิดบัญชีของฉัน</Btn>
         </Card>
+      </div>
+
+      <div className={cx('mt-5 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3 text-sm ring-1', classroom ? 'bg-sky-50 text-sky-900 ring-sky-200' : 'bg-emerald-50 text-emerald-900 ring-emerald-200')}>
+        <School className="h-5 w-5 shrink-0" aria-hidden="true" /><div className="min-w-0 flex-1"><b>{classroom ? `ห้อง ${classroom.name}` : 'โหมดเรียนอิสระ'}</b><p className="text-xs opacity-80">{classroom ? `รหัส ${classroom.code} · ครูเปิดถึง Mission ${String(classroom.unlockedThrough).padStart(2, '0')}${classroom.finalUnlocked ? ' และ Final Case' : ''}` : 'ไม่มีห้องเรียนควบคุม จึงสามารถเลือกเล่นทุก Mission ได้'}</p></div>
       </div>
 
       <motion.button

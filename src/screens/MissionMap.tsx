@@ -1,13 +1,13 @@
 import { motion } from 'motion/react';
 import { Check, Flag, Gift, Lock, Play, RotateCcw, Target, Wrench } from 'lucide-react';
-import { allMissionsDone, avgScore, missionStatus, useStore } from '../store';
+import { avgScore, canAccessFinal, classroomLockReason, missionStatus, useStore } from '../store';
 import { MISSIONS, OBJECTIVES } from '../data/missions';
 import { Btn, StatusTag, cx } from '../components/ui';
 import { Ico } from '../components/icons';
 
 export function MissionMapBody() {
   const { state, go } = useStore();
-  const finalOpen = allMissionsDone(state);
+  const finalOpen = canAccessFinal(state);
 
   return (
       <div className="relative" aria-label="แผนที่ภารกิจ 6 ภารกิจและ Final Case">
@@ -51,7 +51,7 @@ export function MissionMapBody() {
                   <div className="mt-3 flex items-center justify-between gap-2">
                     {rec.best ? <span className="text-xs font-semibold text-emerald-700">คะแนนดีที่สุด {avgScore(rec.best)}%</span> : <span />}
                     {st === 'locked' ? (
-                      <span className="text-xs text-slate-400">ทำ {MISSIONS[i - 1]?.code} ให้สำเร็จก่อน</span>
+                      <span className="text-xs text-slate-400">{classroomLockReason(state, m.id)}</span>
                     ) : (
                       <Btn onClick={() => go({ name: 'mission', id: m.id })} variant={st === 'completed' ? 'secondary' : 'primary'} className="min-h-10 py-2 text-sm">
                         {st === 'completed' ? <><RotateCcw className="h-4 w-4" aria-hidden="true" /> เล่นซ้ำ</> : <><Play className="h-4 w-4" aria-hidden="true" /> เริ่มภารกิจ</>}
@@ -68,7 +68,7 @@ export function MissionMapBody() {
               <p className="mt-1 font-display text-xl font-bold">FINAL CASE</p>
               <p className="text-sm opacity-90">ภารกิจสุดท้ายของ Technician: กู้ระบบห้องทะเบียน</p>
               <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-bold">
-                {state.finalCase.completed ? <><Check className="h-3.5 w-3.5" aria-hidden="true" /> Completed</> : finalOpen ? <><Play className="h-3.5 w-3.5" aria-hidden="true" /> Available</> : <><Lock className="h-3.5 w-3.5" aria-hidden="true" /> ปลดล็อกเมื่อผ่านครบ 6 Mission</>}
+                {state.finalCase.completed ? <><Check className="h-3.5 w-3.5" aria-hidden="true" /> Completed</> : finalOpen ? <><Play className="h-3.5 w-3.5" aria-hidden="true" /> Available</> : <><Lock className="h-3.5 w-3.5" aria-hidden="true" /> {classroomLockReason(state)}</>}
               </p>
               {finalOpen && (
                 <Btn onClick={() => go({ name: 'final' })} className="mt-3 bg-white text-rose-600 shadow-none hover:bg-rose-50">

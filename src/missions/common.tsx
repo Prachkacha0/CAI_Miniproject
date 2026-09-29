@@ -4,7 +4,7 @@ import confetti from 'canvas-confetti';
 import { ArrowRight, BookOpen, House } from 'lucide-react';
 import type { MissionId, MissionScore } from '../types';
 import { MISSION, OBJECTIVES } from '../data/missions';
-import { avgScore, useStore } from '../store';
+import { canAccessFinal, missionStatus, useStore, avgScore } from '../store';
 import { Bar, Btn, Card, Feedback, Steps } from '../components/ui';
 import { Shell } from '../components/Shell';
 import { BuddyBot } from '../components/BuddyBot';
@@ -64,6 +64,7 @@ export function MissionComplete({
     { k: 'independence', th: 'ความเป็นอิสระ', en: 'Independence' },
   ];
   const next = id < 6 ? ((id + 1) as MissionId) : null;
+  const nextOpen = next ? missionStatus(state, next) !== 'locked' : false;
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto max-w-3xl space-y-4">
@@ -98,9 +99,9 @@ export function MissionComplete({
         <Btn variant="secondary" onClick={() => go({ name: 'learn' })}><BookOpen className="h-4 w-4" aria-hidden="true" /> ทบทวน</Btn>
         <Btn variant="secondary" onClick={() => go({ name: 'home' })}><House className="h-4 w-4" aria-hidden="true" /> หน้าหลัก</Btn>
         {next ? (
-          <Btn onClick={() => go({ name: 'mission', id: next })}>Next: {MISSION[next].code} <ArrowRight className="h-4 w-4" aria-hidden="true" /></Btn>
+          <Btn onClick={() => go({ name: 'mission', id: next })} disabled={!nextOpen}>{nextOpen ? `Next: ${MISSION[next].code}` : 'รอครูเปิดด่านถัดไป'} <ArrowRight className="h-4 w-4" aria-hidden="true" /></Btn>
         ) : (
-          <Btn onClick={() => go({ name: 'final' })} disabled={!Object.values(state.missions).every((x) => x.completed)}>ไป Final Case <ArrowRight className="h-4 w-4" aria-hidden="true" /></Btn>
+          <Btn onClick={() => go({ name: 'final' })} disabled={!canAccessFinal(state)}>ไป Final Case <ArrowRight className="h-4 w-4" aria-hidden="true" /></Btn>
         )}
       </div>
     </motion.div>

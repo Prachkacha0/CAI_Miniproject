@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Lock } from 'lucide-react';
-import { allMissionsDone, missionStatus, testPassed, useStore, type Route } from './store';
+import { canAccessFinal, classroomLockReason, missionStatus, testPassed, useStore, type Route } from './store';
+import { isStaff } from './game/classroom';
 import { BuddyProvider } from './components/Buddy';
 import { Btn, Card } from './components/ui';
 import { Shell } from './components/Shell';
@@ -9,6 +10,7 @@ import { Start } from './screens/Start';
 import { Assessment } from './screens/Assessment';
 import { Home } from './screens/Home';
 import { Account } from './screens/Account';
+import { ClassroomControl } from './screens/ClassroomControl';
 import { FinalCase } from './screens/FinalCase';
 import { LearningCenter } from './screens/LearningCenter';
 import { HardwareLab } from './screens/HardwareLab';
@@ -42,7 +44,13 @@ function Locked({ title, reason, to }: { title: string; reason: string; to: Rout
 
 function Screen() {
   const { route, state } = useStore();
-  if ((!state.player && route.name !== 'builder') || route.name === 'start') return <Start />;
+  if (!state.player || route.name === 'start') return <Start />;
+
+  if (isStaff(state.player.role) && route.name !== 'classroom') return <ClassroomControl />;
+
+  if (route.name === 'classroom' && !isStaff(state.player?.role)) {
+    return <Locked title="ศูนย์ควบคุมห้องเรียน" reason="หน้านี้สำหรับครูผู้สอนและผู้ดูแลระบบเท่านั้น" to={{ name: 'home' }} />;
+  }
 
   let node: ReactNode;
   switch (route.name) {
@@ -55,9 +63,12 @@ function Screen() {
     case 'account':
       node = <Account />;
       break;
+    case 'classroom':
+      node = <ClassroomControl />;
+      break;
     case 'mission': {
       if (missionStatus(state, route.id) === 'locked') {
-        node = <Locked title={`Mission ${String(route.id).padStart(2, '0')}`} reason={`ทำ Mission ${String(route.id - 1).padStart(2, '0')} ให้สำเร็จก่อน`} to={{ name: 'home' }} />;
+        node = <Locked title={`Mission ${String(route.id).padStart(2, '0')}`} reason={classroomLockReason(state, route.id)} to={{ name: 'home' }} />;
       } else {
         const M = MISSION_SCREENS[route.id];
         node = <M />;
@@ -65,7 +76,7 @@ function Screen() {
       break;
     }
     case 'final':
-      node = allMissionsDone(state) ? <FinalCase /> : <Locked title="Final Case" reason="ผ่าน Mission 01–06 ให้ครบก่อน" to={{ name: 'home' }} />;
+      node = canAccessFinal(state) ? <FinalCase /> : <Locked title="Final Case" reason={classroomLockReason(state)} to={{ name: 'home' }} />;
       break;
     case 'learn':
       node = <LearningCenter hw={route.hw} />;

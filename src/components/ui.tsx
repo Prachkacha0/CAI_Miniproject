@@ -1,6 +1,6 @@
 import type { ReactNode, ButtonHTMLAttributes } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { CircleCheck, CircleX, Lightbulb, SearchCheck, Trophy, X } from 'lucide-react';
+import { Check, CircleCheck, CircleX, Lightbulb, LockKeyhole, Play, SearchCheck, Trophy, X } from 'lucide-react';
 import type { Category } from '../types';
 import { CATEGORIES } from '../data/hardware';
 
@@ -164,13 +164,13 @@ export function Toast({ show, children }: { show: boolean; children: ReactNode }
 
 export function StatusTag({ status }: { status: 'locked' | 'available' | 'completed' }) {
   const m = {
-    locked: { t: 'Locked · ล็อก', c: 'bg-slate-100 text-slate-500', i: '🔒' },
-    available: { t: 'Available · พร้อมเล่น', c: 'bg-sky-100 text-sky-800', i: '▶' },
-    completed: { t: 'Completed · สำเร็จ', c: 'bg-emerald-100 text-emerald-800', i: '✓' },
+    locked: { t: 'Locked · ล็อก', c: 'bg-slate-100 text-slate-500', Icon: LockKeyhole },
+    available: { t: 'Available · พร้อมเล่น', c: 'bg-sky-100 text-sky-800', Icon: Play },
+    completed: { t: 'Completed · สำเร็จ', c: 'bg-emerald-100 text-emerald-800', Icon: Check },
   }[status];
   return (
     <span className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold', m.c)}>
-      <span aria-hidden="true">{m.i}</span>
+      <m.Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {m.t}
     </span>
   );

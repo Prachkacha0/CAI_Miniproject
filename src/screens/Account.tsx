@@ -1,4 +1,4 @@
-import { Award, ChartColumnBig, CircleCheck, CircleDashed, Pencil, RotateCcw, UserRound } from 'lucide-react';
+import { Award, ChartColumnBig, CircleCheck, CircleDashed, LogOut, Pencil, RotateCcw, School, UserRound } from 'lucide-react';
 import { BADGES } from '../data/missions';
 import { Ico } from '../components/icons';
 import { Bar, Btn, Card, cx } from '../components/ui';
@@ -6,7 +6,7 @@ import { Shell } from '../components/Shell';
 import { certRequirements, certUnlocked, earnedBadges, technicianProfile, useStore } from '../store';
 
 export function Account() {
-  const { state, go, reset } = useStore();
+  const { state, go, reset, signOut } = useStore();
   const badges = earnedBadges(state);
   const requirements = certRequirements(state);
   const certificateReady = certUnlocked(state);
@@ -21,7 +21,7 @@ export function Account() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-4">
                 <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/15 text-2xl font-bold ring-1 ring-white/25">{state.player?.name.slice(0, 1)}</div>
-                <div className="min-w-0 flex-1"><p className="text-xs font-bold tracking-[.18em] text-cyan-300">PLAYER ACCOUNT</p><h2 className="truncate font-display text-2xl font-bold">{state.player?.name}</h2><p className="text-sm text-indigo-100">Junior Computer Technician{state.player?.group ? ` · ${state.player.group}` : ''}</p></div>
+                <div className="min-w-0 flex-1"><p className="text-xs font-bold tracking-[.18em] text-cyan-300">STUDENT ACCOUNT</p><h2 className="truncate font-display text-2xl font-bold">{state.player?.name}</h2><p className="text-sm text-indigo-100">Junior Computer Technician{state.player?.group ? ` · ${state.player.group}` : ''}</p>{state.player?.classroomCode && <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs"><School className="h-3.5 w-3.5" /> ห้อง {state.player.classroomCode}</p>}</div>
               </div>
               <Btn onClick={() => go({ name: 'start' })} className="w-full bg-white text-indigo-700 shadow-none hover:bg-indigo-50 sm:w-auto"><Pencil className="h-4 w-4" /> แก้ไขข้อมูล</Btn>
             </div>
@@ -50,7 +50,7 @@ export function Account() {
           </Card>
         </div>
 
-        <div className="flex justify-end"><Btn variant="ghost" className="text-rose-600" onClick={() => { if (window.confirm('เริ่มใหม่ทั้งหมด? ความคืบหน้าและข้อมูลบัญชีในเครื่องนี้จะถูกลบ')) reset(); }}><RotateCcw className="h-4 w-4" /> ล้างข้อมูลบัญชีและเริ่มใหม่</Btn></div>
+        <div className="flex flex-wrap justify-end gap-2"><Btn variant="secondary" onClick={() => { if (window.confirm('ออกจากโปรไฟล์นักเรียนนี้? ความคืบหน้าของผู้เล่นในเครื่องนี้จะถูกล้างเพื่อไม่ให้ผู้ใช้คนถัดไปเห็นข้อมูลเดิม')) signOut(); }}><LogOut className="h-4 w-4" /> ออกและเปลี่ยนผู้ใช้งาน</Btn><Btn variant="ghost" className="text-rose-600" onClick={() => { if (window.confirm('เริ่มใหม่ทั้งหมด? ความคืบหน้า ห้องเรียน และข้อมูลบัญชีในเครื่องนี้จะถูกลบ')) reset(); }}><RotateCcw className="h-4 w-4" /> ล้างข้อมูลทั้งหมด</Btn></div>
       </div>
     </Shell>
   );
