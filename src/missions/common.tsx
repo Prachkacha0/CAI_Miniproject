@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { ArrowRight, BookOpen, Map } from 'lucide-react';
+import { ArrowRight, BookOpen, House } from 'lucide-react';
 import type { MissionId, MissionScore } from '../types';
 import { MISSION, OBJECTIVES } from '../data/missions';
 import { avgScore, useStore } from '../store';
@@ -21,7 +21,7 @@ export function independence(hints: number) {
 export function MissionFrame({ id, steps, step, brief, children }: { id: MissionId; steps: string[]; step: number; brief: ReactNode; children: ReactNode }) {
   const m = MISSION[id];
   return (
-    <Shell title={`${m.code} · ${m.title}`} subtitle={`${m.gameplay} · LO${m.lo} ${OBJECTIVES[m.lo].en}`} exitTo="map">
+    <Shell title={`${m.code} · ${m.title}`} subtitle={`${m.gameplay} · LO${m.lo} ${OBJECTIVES[m.lo].en}`} exitTo="home">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Steps steps={steps} current={step} />
       </div>
@@ -96,7 +96,7 @@ export function MissionComplete({
       </div>
       <div className="flex flex-wrap justify-end gap-3">
         <Btn variant="secondary" onClick={() => go({ name: 'learn' })}><BookOpen className="h-4 w-4" aria-hidden="true" /> ทบทวน</Btn>
-        <Btn variant="secondary" onClick={() => go({ name: 'map' })}><Map className="h-4 w-4" aria-hidden="true" /> Mission Map</Btn>
+        <Btn variant="secondary" onClick={() => go({ name: 'home' })}><House className="h-4 w-4" aria-hidden="true" /> หน้าหลัก</Btn>
         {next ? (
           <Btn onClick={() => go({ name: 'mission', id: next })}>Next: {MISSION[next].code} <ArrowRight className="h-4 w-4" aria-hidden="true" /></Btn>
         ) : (

@@ -48,7 +48,7 @@ export type Route =
   | { name: 'start' }
   | { name: 'pretest' }
   | { name: 'home' }
-  | { name: 'map' }
+  | { name: 'account' }
   | { name: 'mission'; id: MissionId }
   | { name: 'final' }
   | { name: 'learn'; hw?: string }
@@ -74,10 +74,11 @@ function hashToRoute(hash: string): Route {
   if (head === 'mission') {
     const id = Number(arg);
     if (id >= 1 && id <= 6) return { name: 'mission', id: id as MissionId };
-    return { name: 'map' };
+    return { name: 'home' };
   }
   if (head === 'learn') return { name: 'learn', hw: arg };
-  const simple = ['start', 'pretest', 'home', 'map', 'final', 'lab', 'builder', 'evidence', 'progress', 'posttest', 'reflection', 'certificate'];
+  if (head === 'map') return { name: 'home' };
+  const simple = ['start', 'pretest', 'home', 'account', 'final', 'lab', 'builder', 'evidence', 'progress', 'posttest', 'reflection', 'certificate'];
   if (head && simple.includes(head)) return { name: head } as Route;
   return { name: 'home' };
 }
@@ -221,7 +222,7 @@ export function currentStep(s: GameState): { label: string; route: Route } {
   if (!s.finalCase.completed) return { label: 'Final Case: กู้ระบบห้องทะเบียน', route: { name: 'final' } };
   if (!testPassed(s.postTestBest)) return { label: 'Post-Test', route: { name: 'posttest' } };
   if (!s.reflection) return { label: 'Reflection', route: { name: 'reflection' } };
-  return { label: 'รับ Certificate', route: { name: 'certificate' } };
+  return { label: 'เปิดบัญชีเพื่อรับใบประกาศ', route: { name: 'account' } };
 }
 
 export function certRequirements(s: GameState) {

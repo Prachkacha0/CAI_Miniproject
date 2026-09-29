@@ -8,7 +8,7 @@ import { Shell } from './components/Shell';
 import { Start } from './screens/Start';
 import { Assessment } from './screens/Assessment';
 import { Home } from './screens/Home';
-import { MissionMap } from './screens/MissionMap';
+import { Account } from './screens/Account';
 import { FinalCase } from './screens/FinalCase';
 import { LearningCenter } from './screens/LearningCenter';
 import { HardwareLab } from './screens/HardwareLab';
@@ -52,12 +52,12 @@ function Screen() {
     case 'home':
       node = <Home />;
       break;
-    case 'map':
-      node = <MissionMap />;
+    case 'account':
+      node = <Account />;
       break;
     case 'mission': {
       if (missionStatus(state, route.id) === 'locked') {
-        node = <Locked title={`Mission ${String(route.id).padStart(2, '0')}`} reason={`ทำ Mission ${String(route.id - 1).padStart(2, '0')} ให้สำเร็จก่อน`} to={{ name: 'map' }} />;
+        node = <Locked title={`Mission ${String(route.id).padStart(2, '0')}`} reason={`ทำ Mission ${String(route.id - 1).padStart(2, '0')} ให้สำเร็จก่อน`} to={{ name: 'home' }} />;
       } else {
         const M = MISSION_SCREENS[route.id];
         node = <M />;
@@ -65,7 +65,7 @@ function Screen() {
       break;
     }
     case 'final':
-      node = allMissionsDone(state) ? <FinalCase /> : <Locked title="Final Case" reason="ผ่าน Mission 01–06 ให้ครบก่อน" to={{ name: 'map' }} />;
+      node = allMissionsDone(state) ? <FinalCase /> : <Locked title="Final Case" reason="ผ่าน Mission 01–06 ให้ครบก่อน" to={{ name: 'home' }} />;
       break;
     case 'learn':
       node = <LearningCenter hw={route.hw} />;
@@ -83,10 +83,10 @@ function Screen() {
       node = <Progress />;
       break;
     case 'posttest':
-      node = state.finalCase.completed ? <Assessment kind="post" /> : <Locked title="Post-Test" reason="Post-Test เปิดหลังจบ Final Case" to={{ name: 'map' }} />;
+      node = state.finalCase.completed ? <Assessment kind="post" /> : <Locked title="Post-Test" reason="Post-Test เปิดหลังจบ Final Case" to={{ name: 'home' }} />;
       break;
     case 'reflection':
-      node = testPassed(state.postTestBest) ? <Reflection /> : <Locked title="Reflection" reason="Reflection เปิดหลังผ่าน Post-Test" to={state.finalCase.completed ? { name: 'posttest' } : { name: 'map' }} />;
+      node = testPassed(state.postTestBest) ? <Reflection /> : <Locked title="Reflection" reason="Reflection เปิดหลังผ่าน Post-Test" to={state.finalCase.completed ? { name: 'posttest' } : { name: 'home' }} />;
       break;
     case 'certificate':
       node = <Certificate />;

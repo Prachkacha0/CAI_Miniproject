@@ -1,18 +1,16 @@
 import { motion } from 'motion/react';
-import { Award, BookOpen, ChartColumnBig, ClipboardList, Cpu, FlaskConical, FolderOpen, Map, NotebookPen, Play, RotateCcw, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
-import { allMissionsDone, certUnlocked, currentStep, earnedBadges, missionStatus, testPassed, useStore, type Route } from '../store';
-import { MISSIONS, BADGES } from '../data/missions';
+import { BookOpen, ChartColumnBig, Check, ClipboardList, Cpu, FlaskConical, FolderOpen, Lock, NotebookPen, Play, RotateCcw, ShieldCheck, Sparkles, UserRound, Wrench } from 'lucide-react';
+import { allMissionsDone, currentStep, missionStatus, testPassed, useStore, type Route } from '../store';
+import { MISSIONS } from '../data/missions';
 import { Bar, Btn, Card, cx } from '../components/ui';
 import { Shell } from '../components/Shell';
-import { Ico } from '../components/icons';
-import { BuddyBot } from '../components/BuddyBot';
 import { useBuddyTopic } from '../components/Buddy';
+import { MissionMapBody } from './MissionMap';
 
 export function Home() {
   const { state, go, reset } = useStore();
   const done = MISSIONS.filter((m) => state.missions[m.id].completed).length;
   const step = currentStep(state);
-  const badges = earnedBadges(state);
 
   useBuddyTopic(
     {
@@ -26,14 +24,12 @@ export function Home() {
 
   const tiles: { label: string; en: string; Icon: typeof BookOpen; route: Route; cls: string; locked?: boolean; note?: string }[] = [
     { label: 'ประกอบคอม', en: 'PC Build Lab', Icon: Cpu, route: { name: 'builder' }, cls: 'from-rose-500 to-orange-500', note: 'NEW' },
-    { label: 'แผนที่ภารกิจ', en: 'Mission Map', Icon: Map, route: { name: 'map' }, cls: 'from-indigo-500 to-blue-500' },
     { label: 'คลังความรู้', en: 'Learning Center', Icon: BookOpen, route: { name: 'learn' }, cls: 'from-violet-500 to-fuchsia-500' },
     { label: 'ห้องแล็บ', en: 'Hardware Lab', Icon: FlaskConical, route: { name: 'lab' }, cls: 'from-cyan-500 to-teal-500' },
     { label: 'กระดานหลักฐาน', en: 'Evidence Board', Icon: FolderOpen, route: { name: 'evidence' }, cls: 'from-sky-500 to-cyan-500', note: `${state.evidence.length} ชิ้น` },
     { label: 'ความก้าวหน้า', en: 'Progress', Icon: ChartColumnBig, route: { name: 'progress' }, cls: 'from-emerald-500 to-teal-500' },
     { label: 'แบบประเมิน', en: 'Assessment', Icon: ClipboardList, route: state.finalCase.completed ? { name: 'posttest' } : { name: 'pretest' }, cls: 'from-amber-500 to-orange-500', note: state.finalCase.completed ? (testPassed(state.postTestBest) ? 'Post-Test ผ่านแล้ว' : 'Post-Test') : state.preTest ? `Pre-Test ${state.preTest.score}/${state.preTest.total}` : 'Pre-Test' },
     { label: 'สะท้อนการเรียนรู้', en: 'Reflection', Icon: NotebookPen, route: { name: 'reflection' }, cls: 'from-rose-500 to-pink-500', locked: !testPassed(state.postTestBest), note: state.reflection ? 'ทำแล้ว' : undefined },
-    { label: 'ใบประกาศ', en: 'Certificate', Icon: Award, route: { name: 'certificate' }, cls: 'from-yellow-500 to-amber-500', note: certUnlocked(state) ? 'UNLOCKED' : 'ดูเงื่อนไข' },
   ];
 
   return (
@@ -56,7 +52,7 @@ export function Home() {
                   const st = missionStatus(state, m.id);
                   return (
                     <div key={m.id} className={cx('grid h-9 flex-1 place-items-center rounded-xl text-xs font-bold', st === 'completed' ? 'bg-emerald-400 text-emerald-950' : st === 'available' ? 'bg-white text-indigo-900' : 'bg-white/10 text-indigo-200')}>
-                      {st === 'completed' ? '✓' : st === 'locked' ? '🔒' : `0${m.id}`}
+                      {st === 'completed' ? <Check className="h-4 w-4" aria-label="สำเร็จแล้ว" /> : st === 'locked' ? <Lock className="h-3.5 w-3.5" aria-label="ยังล็อก" /> : `0${m.id}`}
                     </div>
                   );
                 })}
@@ -69,7 +65,7 @@ export function Home() {
           </div>
         </motion.div>
 
-        {/* Player profile */}
+        {/* Account shortcut */}
         <Card className="flex flex-col">
           <div className="flex items-center gap-3">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 to-indigo-500 text-2xl font-bold text-white">
@@ -80,27 +76,11 @@ export function Home() {
               <p className="text-sm text-slate-500">Junior Computer Technician{state.player?.group ? ` · ${state.player.group}` : ''}</p>
             </div>
           </div>
-          <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+          <dl className="mt-4 grid grid-cols-2 gap-2 text-center">
             <Stat label="Missions" value={`${done}/6`} />
             <Stat label="Evidence" value={state.evidence.length} />
-            <Stat label="Badges" value={`${badges.length}/${BADGES.length}`} />
           </dl>
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {BADGES.map((b) => {
-              const got = badges.includes(b.id);
-              return (
-                <span key={b.id} title={b.desc} className={cx('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold', got ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-400')}>
-                  <Ico name={b.icon} className="h-3.5 w-3.5" />
-                  {b.name}
-                  <span className="sr-only">{got ? '(ได้รับแล้ว)' : '(ยังไม่ได้รับ)'}</span>
-                </span>
-              );
-            })}
-          </div>
-          <div className="mt-auto flex items-end gap-2 pt-4">
-            <BuddyBot className="h-10 w-10 shrink-0" />
-            <p className="rounded-2xl rounded-bl-sm bg-indigo-50 px-3 py-2 text-sm text-indigo-900">ติดปัญหาเมื่อไหร่ กดเรียกฉันที่มุมขวาล่างได้เลย!</p>
-          </div>
+          <Btn onClick={() => go({ name: 'account' })} variant="secondary" className="mt-4 w-full"><UserRound className="h-4 w-4" /> เปิดบัญชีของฉัน</Btn>
         </Card>
       </div>
 
@@ -124,6 +104,14 @@ export function Home() {
         </span>
       </motion.button>
 
+      <section id="missions" className="mt-8 scroll-mt-24" aria-labelledby="missions-title">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div><p className="text-xs font-bold tracking-[.18em] text-indigo-600">LEARNING PATH</p><h2 id="missions-title" className="font-display text-2xl font-bold text-slate-900">แผนที่ภารกิจ</h2></div>
+          <span className="text-sm font-semibold text-slate-500">6 Missions + Final Case</span>
+        </div>
+        <MissionMapBody />
+      </section>
+
       <h2 className="mb-3 mt-7 font-display text-lg font-bold text-slate-900">เมนูหลัก</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((t, i) => (
@@ -141,7 +129,7 @@ export function Home() {
             </span>
             <span>
               <span className="block font-bold text-slate-900">{t.label}</span>
-              <span className="block text-xs text-slate-500">{t.en}{t.locked ? ' · 🔒 หลัง Post-Test' : ''}</span>
+              <span className="block text-xs text-slate-500">{t.en}{t.locked ? ' · ต้องผ่าน Post-Test' : ''}</span>
             </span>
             {t.note && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{t.note}</span>}
           </motion.button>

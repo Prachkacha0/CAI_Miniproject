@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { Award, CircleCheck, CircleDashed, Printer } from 'lucide-react';
+import { Award, Check, CircleCheck, CircleDashed, Printer, UserRound } from 'lucide-react';
 import { certRequirements, certUnlocked, useStore } from '../store';
 import { OBJECTIVES } from '../data/missions';
 import { Btn, Card, cx } from '../components/ui';
@@ -41,7 +41,7 @@ export function Certificate() {
             </ul>
             <p className="mt-4 text-xs text-slate-500">ไม่จำเป็นต้องเก็บ Evidence 100%, ใช้ AI Buddy, เข้า Hardware Lab ครบ หรือได้คะแนนเต็ม</p>
           </Card>
-          <div className="flex justify-end"><Btn onClick={() => go({ name: 'home' })}>กลับหน้าหลัก</Btn></div>
+          <div className="flex justify-end"><Btn onClick={() => go({ name: 'account' })}><UserRound className="h-4 w-4" aria-hidden="true" /> กลับบัญชีของฉัน</Btn></div>
         </div>
       </Shell>
     );
@@ -74,7 +74,7 @@ export function Certificate() {
               <p className="text-sm text-slate-500">ภารกิจกู้ระบบคอมพิวเตอร์ · องค์ประกอบของระบบคอมพิวเตอร์ (Hardware)</p>
               <div className="mx-auto mt-6 flex max-w-2xl flex-wrap justify-center gap-1.5">
                 {Object.values(OBJECTIVES).map((o) => (
-                  <span key={o.en} className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">✓ {o.en}</span>
+                  <span key={o.en} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700"><Check className="h-3.5 w-3.5" aria-hidden="true" /> {o.en}</span>
                 ))}
               </div>
               <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
@@ -93,7 +93,7 @@ export function Certificate() {
         <div className="mt-5 flex flex-wrap justify-center gap-3 print:hidden">
           <Btn onClick={() => window.print()}><Printer className="h-4 w-4" aria-hidden="true" /> พิมพ์ / บันทึก PDF</Btn>
           <Btn variant="secondary" onClick={() => go({ name: 'progress' })}>ดูความก้าวหน้า</Btn>
-          <Btn variant="secondary" onClick={() => go({ name: 'home' })}>หน้าหลัก</Btn>
+          <Btn variant="secondary" onClick={() => go({ name: 'account' })}><UserRound className="h-4 w-4" aria-hidden="true" /> บัญชีของฉัน</Btn>
         </div>
       </div>
     </Shell>

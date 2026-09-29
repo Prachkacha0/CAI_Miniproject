@@ -196,7 +196,7 @@ export function FinalCase() {
   }
 
   return (
-    <Shell title="FINAL CASE · กู้ระบบห้องทะเบียน" subtitle="ภารกิจสุดท้ายของ Technician" exitTo="map">
+    <Shell title="FINAL CASE · กู้ระบบห้องทะเบียน" subtitle="ภารกิจสุดท้ายของ Technician" exitTo="home">
       <div className="mb-4 overflow-x-auto pb-1">
         <Steps steps={STEPS} current={step} />
       </div>

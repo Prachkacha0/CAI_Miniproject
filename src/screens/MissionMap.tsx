@@ -1,29 +1,16 @@
 import { motion } from 'motion/react';
-import { Flag, Gift, Lock, Play, RotateCcw, Target, Wrench } from 'lucide-react';
+import { Check, Flag, Gift, Lock, Play, RotateCcw, Target, Wrench } from 'lucide-react';
 import { allMissionsDone, avgScore, missionStatus, useStore } from '../store';
 import { MISSIONS, OBJECTIVES } from '../data/missions';
 import { Btn, StatusTag, cx } from '../components/ui';
-import { Shell } from '../components/Shell';
 import { Ico } from '../components/icons';
-import { useBuddyTopic } from '../components/Buddy';
 
-export function MissionMap() {
+export function MissionMapBody() {
   const { state, go } = useStore();
   const finalOpen = allMissionsDone(state);
 
-  useBuddyTopic(
-    {
-      scope: null,
-      hint: 'Mission จะปลดล็อกทีละภารกิจ ภารกิจที่ทำสำเร็จแล้วกลับไปเล่นซ้ำได้เสมอ',
-      evidence: ['แต่ละ Mission บอก Objective และ Skill ที่จะได้ฝึกไว้บนการ์ด'],
-      lesson: { text: 'ทั้ง 6 Mission เรียงจากความหมาย → ความสำคัญ → ประเภท → หน้าที่ → การระบุ → การเลือก Hardware' },
-    },
-    [],
-  );
-
   return (
-    <Shell title="Mission Map · แผนที่ภารกิจ" subtitle="6 Missions + Final Case">
-      <div className="relative">
+      <div className="relative" aria-label="แผนที่ภารกิจ 6 ภารกิจและ Final Case">
         <div className="absolute bottom-10 left-7 top-10 w-1 rounded-full bg-gradient-to-b from-sky-300 via-violet-300 to-rose-300 sm:left-1/2 sm:-ml-0.5" aria-hidden="true" />
         <ol className="relative space-y-5">
           {MISSIONS.map((m, i) => {
@@ -46,7 +33,7 @@ export function MissionMap() {
                   aria-hidden="true"
                 >
                   {st === 'locked' ? <Lock className="h-6 w-6" /> : <Ico name={m.icon} className="h-6 w-6" />}
-                  {st === 'available' && <span className="absolute -inset-1 animate-ping rounded-2xl ring-2 ring-indigo-400/60" />}
+                  {st === 'available' && <span className="absolute -inset-1 rounded-2xl ring-2 ring-indigo-400/60" />}
                 </div>
                 <div className={cx('flex-1 rounded-3xl bg-white p-4 shadow-[0_8px_30px_-12px_rgba(30,41,99,0.18)] ring-1', st === 'available' ? 'ring-indigo-300' : 'ring-slate-100', st === 'locked' && 'opacity-70')}>
                   <div className="flex flex-wrap items-center gap-2">
@@ -80,7 +67,9 @@ export function MissionMap() {
               <Flag className="mx-auto h-8 w-8" aria-hidden="true" />
               <p className="mt-1 font-display text-xl font-bold">FINAL CASE</p>
               <p className="text-sm opacity-90">ภารกิจสุดท้ายของ Technician: กู้ระบบห้องทะเบียน</p>
-              <p className="mt-1 text-xs font-bold">{state.finalCase.completed ? '✓ Completed' : finalOpen ? '▶ Available' : '🔒 ปลดล็อกเมื่อผ่านครบ 6 Mission'}</p>
+              <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-bold">
+                {state.finalCase.completed ? <><Check className="h-3.5 w-3.5" aria-hidden="true" /> Completed</> : finalOpen ? <><Play className="h-3.5 w-3.5" aria-hidden="true" /> Available</> : <><Lock className="h-3.5 w-3.5" aria-hidden="true" /> ปลดล็อกเมื่อผ่านครบ 6 Mission</>}
+              </p>
               {finalOpen && (
                 <Btn onClick={() => go({ name: 'final' })} className="mt-3 bg-white text-rose-600 shadow-none hover:bg-rose-50">
                   {state.finalCase.completed ? 'เล่นซ้ำ' : 'เริ่ม Final Case'}
@@ -90,6 +79,5 @@ export function MissionMap() {
           </li>
         </ol>
       </div>
-    </Shell>
   );
 }

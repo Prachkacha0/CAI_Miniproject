@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowLeft, BookOpen, FolderOpen, House, LogOut } from 'lucide-react';
+import { ArrowLeft, BookOpen, FolderOpen, House, LogOut, UserRound } from 'lucide-react';
 import { useStore } from '../store';
 import { Modal, cx } from './ui';
 import { LearningCenterBody } from '../screens/LearningCenter';
@@ -20,7 +20,7 @@ export function Shell({
   title: string;
   subtitle?: string;
   children: ReactNode;
-  exitTo?: 'map' | 'home';
+  exitTo?: 'home';
   wide?: boolean;
   minimal?: boolean;
 }) {
@@ -53,6 +53,10 @@ export function Shell({
             <h1 className="truncate font-display text-base font-bold text-slate-900 sm:text-lg">{title}</h1>
             {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
           </div>
+          {!minimal && <button onClick={() => go({ name: 'account' })} className="inline-flex h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-semibold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-50" aria-label="เปิดบัญชีของฉัน">
+            <UserRound className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden md:inline">บัญชี</span>
+          </button>}
           {!minimal && <button onClick={() => setDrawer('learn')} className="inline-flex h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-semibold text-violet-700 ring-1 ring-violet-200 hover:bg-violet-50 max-[420px]:hidden" aria-label="เปิด Learning Center">
             <BookOpen className="h-4 w-4" aria-hidden="true" />
             <span className="hidden md:inline">ความรู้</span>
