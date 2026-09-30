@@ -1,8 +1,9 @@
-import type { ReactNode, ButtonHTMLAttributes } from 'react';
+import { useEffect, type ReactNode, type ButtonHTMLAttributes } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Check, CircleCheck, CircleX, Lightbulb, LockKeyhole, Play, SearchCheck, Trophy, X } from 'lucide-react';
 import type { Category } from '../types';
 import { CATEGORIES } from '../data/hardware';
+import { playCue, type GameCue } from '../game/sound';
 
 export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(' ');
@@ -69,6 +70,10 @@ const FB: Record<FeedbackKind, { title: string; cls: string; Icon: typeof Circle
 
 export function Feedback({ kind, children, title, className }: { kind: FeedbackKind; children?: ReactNode; title?: string; className?: string }) {
   const f = FB[kind];
+  useEffect(() => {
+    const cue: GameCue | null = kind === 'correct' ? 'correct' : kind === 'incorrect' ? 'incorrect' : kind === 'complete' ? 'complete' : null;
+    if (cue) playCue(cue);
+  }, [kind]);
   return (
     <motion.div
       role="status"

@@ -83,6 +83,13 @@ const CLIENTS: Client[] = [
     weight: { cpu: 2, ram: 2, gpu: 0.5, storage: 2, monitor: 1, keyboard: 1, mouse: 1 },
     critical: ['ram', 'storage'],
   },
+  {
+    id: 'student', name: 'น้องฟ้า', role: 'นักเรียนเรียนออนไลน์และเขียนโค้ด', avatar: '🎓', budget: 22000,
+    req: ['เรียนออนไลน์พร้อมเปิดหลายแท็บ', 'ทำรายงานและเขียนโปรแกรมพื้นฐาน', 'ต้องการเครื่องตอบสนองไว', 'Budget 22,000 THB'],
+    need: { cpu: 2, ram: 3, gpu: 1, storage: 3, monitor: 2, keyboard: 2, mouse: 2 },
+    weight: { cpu: 2, ram: 3, gpu: 0.5, storage: 2, monitor: 1.5, keyboard: 1, mouse: 1 },
+    critical: ['ram', 'storage'],
+  },
 ];
 
 const REASONS = ['ตรงกับลักษณะงานของลูกค้า', 'อยู่ในงบประมาณ', 'ไม่ซื้อสเปกเกินความจำเป็น', 'เลือกชิ้นที่แพงที่สุดไว้ก่อน', 'ให้ความสำคัญกับอุปกรณ์หลักของงาน', 'เลือกเพราะหน้าตาสวย'];

@@ -8,8 +8,7 @@ function state(overrides: Partial<GameState> = {}): GameState {
     version: 1,
     player: { name: 'Student', group: '', role: 'student' },
     classrooms: {},
-    adminPinHash: null,
-    teacherPinHash: null,
+    teacherAccounts: {},
     preTest: null,
     postTest: null,
     postTestBest: null,
@@ -30,9 +29,8 @@ test('normalizes classroom codes', () => {
   assert.equal(normalizeClassroomCode('abcdefghijklmnop'), 'ABCDEFGHIJKL');
 });
 
-test('teacher and admin are staff', () => {
+test('only teachers are staff', () => {
   assert.equal(isStaff('teacher'), true);
-  assert.equal(isStaff('admin'), true);
   assert.equal(isStaff('student'), false);
 });
 

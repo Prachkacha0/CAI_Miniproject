@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowRight, CircleCheck, CircleX, Power, TriangleAlert } from 'lucide-react';
 import type { Category } from '../types';
@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import { CATEGORIES, CATEGORY_ORDER } from '../data/hardware';
 import { Btn, Card, Feedback, cx, type FeedbackKind } from '../components/ui';
 import { Ico } from '../components/icons';
+import { HardwareArt, hasArt } from '../components/HardwareArt';
 import { useBuddyTopic } from '../components/Buddy';
 import { MissionComplete, MissionFrame, clamp, independence } from './common';
 import { useMissionHints } from './useMissionHints';
@@ -45,6 +46,7 @@ export function Mission2() {
   const [removed, setRemoved] = useState<string[]>([]);
   const [tested, setTested] = useState<string[]>([]);
   const [last, setLast] = useState<Part | null>(null);
+  const [focusedId, setFocusedId] = useState<string>('cpu');
   const [phase, setPhase] = useState<'lab' | 'diagnose' | 'conclude' | 'done'>('lab');
   const [fb, setFb] = useState<{ kind: FeedbackKind; text: string } | null>(null);
   const [caseIdx, setCaseIdx] = useState(0);
@@ -148,32 +150,29 @@ export function Mission2() {
     >
       {phase === 'lab' && (
         <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-          <Card>
-            <p className="mb-3 text-sm font-semibold text-slate-600">แตะเพื่อ ถอด / ใส่ คืน</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {PARTS.map((p) => {
-                const off = removed.includes(p.id);
-                const c = CATEGORIES[p.cat];
-                return (
-                  <motion.button
-                    key={p.id}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => toggle(p)}
-                    aria-pressed={off}
-                    className={cx('relative flex flex-col items-center gap-1.5 rounded-2xl p-3 ring-2 transition', off ? 'bg-slate-100 ring-slate-300' : cx('bg-white', c.ring))}
-                  >
-                    <span className={cx('grid h-12 w-12 place-items-center rounded-xl', off ? 'bg-slate-200 text-slate-400' : cx(c.soft, c.text))}>
-                      <Ico name={p.icon} className="h-6 w-6" />
-                    </span>
-                    <span className={cx('text-sm font-bold', off ? 'text-slate-400 line-through' : 'text-slate-800')}>{p.en}</span>
-                    <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-bold', off ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700')}>{off ? 'ถอดแล้ว · Removed' : 'ติดตั้ง · Installed'}</span>
-                    {tested.includes(p.id) && <span className="absolute right-2 top-2 text-xs text-sky-600" title="ทดลองแล้ว">🔎</span>}
-                  </motion.button>
-                );
-              })}
-            </div>
-          </Card>
           <div className="space-y-4">
+            <WorkbenchScene parts={PARTS} removed={removed} tested={tested} focusedId={focusedId} onFocus={setFocusedId} onDrop={toggle} />
+          </div>
+          <div className="space-y-4">
+            {(() => {
+              const focused = PARTS.find((p) => p.id === focusedId) ?? PARTS[0];
+              const off = removed.includes(focused.id);
+              const c = CATEGORIES[focused.cat];
+              return <div className="overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-200">
+                <div className="relative grid min-h-40 place-items-center bg-[radial-gradient(ellipse_at_center,_#27364a,_#101827)] p-4">
+                  <span className="absolute left-3 top-3 rounded-full bg-black/40 px-2.5 py-1 text-[10px] font-bold tracking-widest text-cyan-200">MACRO VIEW · 01×</span>
+                  {hasArt(focused.id) ? <HardwareArt art={focused.id} title={focused.en} className="w-full max-w-52 drop-shadow-[0_16px_22px_rgba(0,0,0,.45)]" /> : <Ico name={focused.icon} className="h-20 w-20 text-slate-100 drop-shadow-xl" />}
+                  {off && <span className="absolute bottom-3 right-3 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-black text-slate-950">ON BENCH</span>}
+                </div>
+                <div className="p-4">
+                  <p className="text-[10px] font-black tracking-[.18em] text-indigo-500">PART INSPECTOR</p>
+                  <h3 className="mt-1 font-display text-lg font-bold text-slate-900">{focused.en}</h3>
+                  <p className={cx('mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold', c.soft, c.text)}>{c.en} · {off ? 'removed' : 'installed'}</p>
+                  <p className="mt-3 min-h-12 text-sm leading-relaxed text-slate-600">{off ? focused.effect : `ทำงานในกลุ่ม ${c.en} — ลองหยิบออกเพื่อดูผลกระทบที่เกิดกับเครื่อง`}</p>
+                  <button onClick={() => toggle(focused)} className="mt-3 min-h-11 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-indigo-700 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">{off ? 'ใส่ชิ้นส่วนกลับเข้าที่' : 'ถอดชิ้นส่วนออกมาทดสอบ'}</button>
+                </div>
+              </div>;
+            })()}
             <div className="rounded-3xl bg-slate-900 p-4 text-slate-100 shadow-xl">
               <p className="mb-2 flex items-center gap-2 text-xs font-bold tracking-widest text-cyan-300"><Power className="h-4 w-4" aria-hidden="true" /> SYSTEM STATUS</p>
               <ul className="space-y-1.5">
@@ -285,4 +284,94 @@ export function Mission2() {
       )}
     </MissionFrame>
   );
+}
+
+function WorkbenchScene({ parts, removed, tested, focusedId, onFocus, onDrop }: {
+  parts: Part[]; removed: string[]; tested: string[]; focusedId: string;
+  onFocus: (id: string) => void; onDrop: (part: Part) => void;
+}) {
+  const caseRef = useRef<HTMLDivElement>(null);
+  const matRef = useRef<HTMLDivElement>(null);
+  const heldRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  const removedRef = useRef(removed);
+  const dropRef = useRef(onDrop);
+  const [held, setHeld] = useState<{ id: string; x: number; y: number } | null>(null);
+  removedRef.current = removed;
+  dropRef.current = onDrop;
+
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (!heldRef.current) return;
+      const next = { ...heldRef.current, x: e.clientX, y: e.clientY };
+      heldRef.current = next;
+      setHeld(next);
+    };
+    const up = (e: PointerEvent) => {
+      const piece = heldRef.current;
+      if (!piece) return;
+      const isOnBench = removedRef.current.includes(piece.id);
+      const zone = (isOnBench ? caseRef.current : matRef.current)?.getBoundingClientRect();
+      if (zone && e.clientX >= zone.left && e.clientX <= zone.right && e.clientY >= zone.top && e.clientY <= zone.bottom) {
+        const part = parts.find((p) => p.id === piece.id);
+        if (part) dropRef.current(part);
+      }
+      heldRef.current = null;
+      setHeld(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, [parts]);
+
+  const grab = (id: string, e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    onFocus(id);
+    const next = { id, x: e.clientX, y: e.clientY };
+    heldRef.current = next;
+    setHeld(next);
+  };
+
+  const tile = (p: Part) => {
+    const off = removed.includes(p.id);
+    const focused = focusedId === p.id;
+    return <motion.button key={p.id} layout type="button" onClick={() => onFocus(p.id)} onPointerDown={(e) => grab(p.id, e)} aria-label={`${off ? 'วางบนแผ่นรองแล้ว' : 'ติดตั้งในเคส'}: ${p.en} กดค้างแล้วลากย้าย`} aria-grabbed={held?.id === p.id}
+      className={cx('group relative flex min-h-24 w-full touch-none select-none flex-col items-center justify-center overflow-hidden rounded-2xl border bg-white/95 p-2 shadow-[0_8px_20px_-12px_rgba(15,23,42,.6)] transition', focused ? 'border-cyan-400 ring-2 ring-cyan-300/70' : 'border-white/70 hover:-translate-y-0.5 hover:shadow-lg', held?.id === p.id && 'opacity-30')}>
+      {tested.includes(p.id) && <span className="absolute right-1.5 top-1.5 z-10 rounded-full bg-sky-100 px-1.5 text-[9px] font-black text-sky-700">TESTED</span>}
+      <span className="grid h-14 w-full place-items-center">{hasArt(p.id) ? <HardwareArt art={p.id} title={p.en} className="h-14 w-full drop-shadow-md" /> : <Ico name={p.icon} className="h-10 w-10 text-slate-700 drop-shadow" />}</span>
+      <span className="mt-1 w-full truncate text-center text-[11px] font-extrabold text-slate-800">{p.en}</span>
+      <span className={cx('mt-0.5 rounded-full px-2 py-0.5 text-[9px] font-black tracking-wide', off ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800')}>{off ? 'ESD MAT' : 'SEATED'}</span>
+    </motion.button>;
+  };
+
+  const installed = parts.filter((p) => !removed.includes(p.id));
+  const onBench = parts.filter((p) => removed.includes(p.id));
+  const dragged = held && parts.find((p) => p.id === held.id);
+  return <section className="overflow-hidden rounded-[1.75rem] bg-[#0a1220] p-3 shadow-2xl ring-1 ring-slate-800 sm:p-4" aria-label="Interactive hardware repair bench">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+      <div><p className="text-[10px] font-black tracking-[.22em] text-cyan-300">GARAGE 02 / REPAIR BAY</p><h2 className="font-display text-lg font-extrabold text-white">Interactive workbench</h2></div>
+      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-bold tracking-widest text-emerald-200">POWER SAFE · ESD READY</span>
+    </div>
+    <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
+      <div ref={caseRef} className="relative min-h-64 overflow-hidden rounded-3xl border border-slate-600 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-950 p-3 shadow-inner sm:p-4">
+        <div className="pointer-events-none absolute inset-2 rounded-2xl border border-white/10" />
+        <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-bold tracking-[.2em] text-slate-400">OPEN CHASSIS</p><p className="text-sm font-black text-white">MAIN UNIT <span className="text-slate-400">/ {installed.length} PARTS</span></p></div><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_14px_4px_rgba(52,211,153,.45)]" /></div>
+        <div className="pointer-events-none absolute bottom-8 right-6 h-24 w-24 rounded-full border-[9px] border-slate-600/80 bg-[radial-gradient(circle,_#334155_0_24%,_#0f172a_26%_42%,_#475569_45%_50%,_#172033_52%)] shadow-[0_0_35px_rgba(34,211,238,.12)] sm:right-8 sm:h-32 sm:w-32"><div className="absolute inset-3 animate-[spin_8s_linear_infinite] rounded-full border border-cyan-300/20"><i className="absolute left-1/2 top-0 h-1/2 w-px origin-bottom bg-cyan-200/40" /></div><span className="absolute inset-0 grid place-items-center"><Ico name="circuit" className="h-7 w-7 text-cyan-300/70" /></span></div>
+        <div className="relative grid max-w-[72%] grid-cols-2 gap-2 sm:max-w-[74%]">{installed.length ? installed.map(tile) : <div className="col-span-2 grid min-h-40 place-items-center rounded-2xl border border-dashed border-slate-500 bg-black/20 p-5 text-center text-sm font-bold text-slate-300">เคสว่างแล้ว<br /><span className="mt-1 text-xs font-normal text-slate-400">ลากอุปกรณ์จากแผ่นรองกลับมา</span></div>}</div>
+        <p className="pointer-events-none absolute bottom-2 left-4 text-[9px] font-bold tracking-widest text-slate-500">DRAG PART → ESD MAT TO REMOVE</p>
+      </div>
+      <div ref={matRef} className="relative min-h-64 overflow-hidden rounded-3xl border border-emerald-900 bg-[#064e3b] p-3 shadow-inner [background-image:linear-gradient(45deg,rgba(255,255,255,.035)_25%,transparent_25%,transparent_75%,rgba(255,255,255,.035)_75%),linear-gradient(45deg,rgba(255,255,255,.035)_25%,transparent_25%,transparent_75%,rgba(255,255,255,.035)_75%)] [background-position:0_0,8px_8px] [background-size:16px_16px] sm:p-4">
+        <div className="pointer-events-none absolute inset-2 rounded-2xl border border-emerald-200/15" />
+        <div className="relative mb-3 flex items-center justify-between"><div><p className="text-[9px] font-bold tracking-[.2em] text-emerald-200/70">ANTI-STATIC SURFACE</p><p className="text-sm font-black text-white">ESD INSPECTION MAT <span className="text-emerald-100/70">/ {onBench.length} PARTS</span></p></div><span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-950/40 text-xs font-black text-emerald-200">ESD</span></div>
+        <div className="relative grid grid-cols-2 gap-2 sm:grid-cols-3">{onBench.length ? onBench.map(tile) : <div className="col-span-full grid min-h-40 place-items-center rounded-2xl border border-dashed border-emerald-100/25 bg-emerald-950/20 p-5 text-center text-sm font-bold text-emerald-50">แผ่นรองพร้อมใช้งาน<span className="mt-1 block text-xs font-normal text-emerald-100/70">หยิบชิ้นส่วนในเคส แล้วลากมาวางที่นี่</span></div>}</div>
+      </div>
+    </div>
+    <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white/5 px-3 py-2 text-xs text-slate-300"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-cyan-300/15 text-cyan-200"><Ico name="hand" className="h-4 w-4" /></span><span><b className="text-white">จับชิ้นส่วน:</b> กดค้างแล้วลากไปยังอีกพื้นที่ · แตะเพื่อเลือกดูใกล้ ๆ · ใช้ปุ่ม PART INSPECTOR เพื่อถอด/ใส่ได้เช่นกัน</span></div>
+    {dragged && <div className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-1/2 rounded-2xl border-2 border-cyan-300 bg-slate-950/90 p-2 shadow-[0_18px_45px_rgba(0,0,0,.55)]" style={{ left: held!.x, top: held!.y }} aria-hidden="true"><span className="grid h-16 w-20 place-items-center">{hasArt(dragged.id) ? <HardwareArt art={dragged.id} title={dragged.en} className="h-14 w-full" /> : <Ico name={dragged.icon} className="h-10 w-10 text-white" />}</span><span className="block text-center text-[10px] font-black text-white">{dragged.en}</span></div>}
+  </section>;
 }

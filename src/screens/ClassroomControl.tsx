@@ -1,19 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Check, Clipboard, DoorOpen, GraduationCap, KeyRound, LockKeyhole, Plus, Power, ShieldCheck, Users } from 'lucide-react';
+import { Check, Clipboard, DoorOpen, GraduationCap, LockKeyhole, Plus, Power, Users } from 'lucide-react';
 import { normalizeClassroomCode } from '../game/classroom';
 import { useStore } from '../store';
 import { Btn, Card, cx } from '../components/ui';
 import { Shell } from '../components/Shell';
 
 export function ClassroomControl() {
-  const { state, createClassroom, updateClassroom, setTeacherPin, signOut } = useStore();
+  const { state, createClassroom, updateClassroom, signOut } = useStore();
   const [name, setName] = useState('');
   const [preferredCode, setPreferredCode] = useState('');
   const [message, setMessage] = useState('');
-  const [teacherPin, setTeacherPinValue] = useState('');
-  const [pinMessage, setPinMessage] = useState('');
-  const isAdmin = state.player?.role === 'admin';
-  const rooms = useMemo(() => Object.values(state.classrooms).filter((room) => isAdmin || room.teacherName === state.player?.name).sort((a, b) => b.updatedAt - a.updatedAt), [isAdmin, state.classrooms, state.player?.name]);
+  const rooms = useMemo(() => Object.values(state.classrooms).filter((room) => room.teacherName === state.player?.name).sort((a, b) => b.updatedAt - a.updatedAt), [state.classrooms, state.player?.name]);
 
   const addRoom = () => {
     const roomName = name.trim();
@@ -27,19 +24,14 @@ export function ClassroomControl() {
   };
 
   return (
-    <Shell title="ศูนย์ควบคุมห้องเรียน" subtitle={`${isAdmin ? 'ผู้ดูแลระบบ' : 'ครูผู้สอน'} · ควบคุมการเปิดด่าน`} wide>
+    <Shell title="ศูนย์ควบคุมห้องเรียน" subtitle="ครูผู้สอน · ควบคุมการเปิดด่าน" wide>
       <div className="space-y-5">
         <Card className="overflow-hidden bg-gradient-to-br from-indigo-700 to-violet-800 text-white ring-0">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15">{isAdmin ? <ShieldCheck className="h-6 w-6" /> : <GraduationCap className="h-6 w-6" />}</span><div><p className="text-xs font-bold tracking-[.16em] text-cyan-200">CLASSROOM CONTROL</p><h2 className="font-display text-2xl font-bold">สวัสดี {state.player?.name}</h2><p className="text-sm text-indigo-100">สร้างรหัสห้อง แล้วกำหนดว่านักเรียนในห้องเปิดได้ถึงด่านใด</p></div></div>
+            <div className="flex min-w-0 flex-1 items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15"><GraduationCap className="h-6 w-6" /></span><div><p className="text-xs font-bold tracking-[.16em] text-cyan-200">CLASSROOM CONTROL</p><h2 className="font-display text-2xl font-bold">สวัสดี {state.player?.name}</h2><p className="text-sm text-indigo-100">สร้างรหัสห้อง แล้วกำหนดว่านักเรียนในห้องเปิดได้ถึงด่านใด</p></div></div>
             <Btn onClick={signOut} className="bg-white text-indigo-700 shadow-none hover:bg-indigo-50"><DoorOpen className="h-4 w-4" /> เปลี่ยนผู้ใช้งาน</Btn>
           </div>
         </Card>
-
-        {isAdmin && <Card className="border border-cyan-200 bg-cyan-50 shadow-none">
-          <div className="grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end"><div><div className="flex items-center gap-2"><LockKeyhole className="h-5 w-5 text-cyan-700" /><h2 className="font-display text-lg font-bold text-slate-900">กำหนด Teacher PIN</h2></div><p className="mt-1 text-xs text-slate-600">ใช้ PIN แยกจาก Admin เพื่อให้ครูเข้าควบคุมได้เฉพาะห้องของตนเอง</p></div><label><span className="mb-1 block text-sm font-semibold text-slate-700">Teacher PIN ใหม่</span><input type="password" inputMode="numeric" autoComplete="new-password" value={teacherPin} onChange={(event) => { setTeacherPinValue(event.target.value.replace(/\D/g, '').slice(0, 8)); setPinMessage(''); }} className="h-12 w-full rounded-2xl border border-cyan-200 bg-white px-4 text-base outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100" placeholder="ตัวเลข 4–8 หลัก" /></label><Btn disabled={!/^\d{4,8}$/.test(teacherPin)} onClick={() => { setTeacherPin(teacherPin); setTeacherPinValue(''); setPinMessage('บันทึก Teacher PIN แล้ว'); }}><KeyRound className="h-4 w-4" /> บันทึก PIN</Btn></div>
-          {pinMessage && <p role="status" className="mt-3 text-sm font-semibold text-emerald-700">{pinMessage}</p>}
-        </Card>}
 
         <Card>
           <div className="flex items-center gap-2"><Plus className="h-5 w-5 text-indigo-600" /><h2 className="font-display text-lg font-bold text-slate-900">สร้างห้องเรียน</h2></div>

@@ -1,16 +1,21 @@
 export type Category = 'input' | 'processing' | 'storage' | 'output' | 'communication';
 
-export type LOId = 1 | 2 | 3 | 4 | 5 | 6;
+export type LOId = 1 | 2 | 3 | 4 | 5;
 
 export type MissionId = 1 | 2 | 3 | 4 | 5 | 6;
 
-export type UserRole = 'student' | 'teacher' | 'admin';
+export type UserRole = 'student' | 'teacher';
 
 export interface PlayerProfile {
   name: string;
   group: string;
   role: UserRole;
   classroomCode?: string;
+}
+
+export interface TeacherAccount {
+  name: string;
+  passwordHash: string;
 }
 
 export interface Classroom {
@@ -71,6 +76,7 @@ export interface TestResult {
   byLO: Record<LOId, { correct: number; total: number }>;
   answers: number[];
   at: number;
+  outcomeVersion?: 2;
 }
 
 export interface ReflectionData {
@@ -92,8 +98,7 @@ export interface GameState {
   version: 1;
   player: PlayerProfile | null;
   classrooms: Record<string, Classroom>;
-  adminPinHash: string | null;
-  teacherPinHash: string | null;
+  teacherAccounts: Record<string, TeacherAccount>;
   preTest: TestResult | null;
   postTest: TestResult | null; // latest attempt
   postTestBest: TestResult | null;

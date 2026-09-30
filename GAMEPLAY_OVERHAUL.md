@@ -1,5 +1,24 @@
 # Hardware Quest — PC Build Lab Overhaul
 
+## Learning mission alignment (30 Sep 2026)
+
+Mission 1–6 have been aligned to five hardware learning outcomes: hardware meaning (M1–M2), functional categories (M3), component names/functions (M4), visual identification (M5), and selecting hardware for a task (M6). Assessment and progress indicators use the same five outcomes. See [MISSION_DESIGN.md](./MISSION_DESIGN.md) for each mission's activity, evidence of learning, and feedback flow.
+
+## Role and teacher access-code update (30 Sep 2026)
+
+- Keep only Student and Teacher roles; remove Admin role and the Admin-controlled Teacher PIN panel.
+- Teachers create a free-form text passphrase on first use and confirm it on later sign-ins. It accepts letters, numbers, and symbols without an 8-character maximum.
+- Migrate any saved Admin session to Teacher and reuse its former access hash when there is no teacher hash, preserving existing classrooms.
+- Limit teachers to managing classrooms they own.
+- Access codes remain local browser protection, not server-grade authentication.
+
+## Teacher registration update (30 Sep 2026)
+
+- Add separate Teacher sign-in and Teacher registration modes on the role selection screen.
+- Each teacher can register a unique account name and an individual free-form password (minimum 4 characters; no maximum length), then sign in with those credentials.
+- Store teacher accounts alongside local game data and keep classroom management scoped to the matching teacher name.
+- Existing single shared teacher/Admin access hashes are migrated to an account when the matching teacher session is still available.
+
 อัปเดตเมื่อ: 29 กันยายน 2026
 
 ## ภาพรวม
@@ -200,7 +219,7 @@ npm.cmd run dev
 ## ระบบ Role และ Classroom Gate (กันยายน 2026)
 
 - หน้า Login รองรับ 3 บทบาท: นักเรียน, ครูผู้สอน และผู้ดูแลระบบ
-- ผู้ดูแลระบบตั้ง Admin PIN ตัวเลข 4–8 หลักในการเข้าใช้ครั้งแรก และกำหนด Teacher PIN แยกต่างหากจากศูนย์ควบคุม จากนั้นแต่ละบทบาทต้องยืนยัน PIN ของตนก่อนเข้าใช้งาน โดยจัดเก็บเป็นค่าแฮชแทนข้อความ PIN ตรง ๆ
+- ระบบมีเพียง 2 บทบาท: นักเรียนและครูผู้สอน ครูตั้งรหัสผ่านข้อความได้เองในครั้งแรกและใช้ยืนยันตัวตนครั้งถัดไป โดยไม่จำกัดเฉพาะตัวเลขหรือความยาว 8 ตัว (เก็บเป็นค่าแฮชในเบราว์เซอร์)
 - นักเรียนเลือกเรียนแบบอิสระได้โดยไม่กรอกรหัสห้อง ซึ่งจะเปิดให้เลือกทุก Mission
 - นักเรียนที่กรอกรหัสห้องต้องใช้รหัสที่มีอยู่จริง และระบบจะผูกกลุ่มเรียนตามห้องนั้นอัตโนมัติ
 - ครูสร้างห้องเรียนและรหัสห้อง กำหนดว่าเปิดถึง Mission ใด เปิด/ปิด Final Case และพักการใช้งานห้องได้
@@ -214,6 +233,6 @@ npm.cmd run dev
 
 ### ขอบเขตสำคัญ
 
-เวอร์ชันนี้เป็น Classroom Control แบบ Local-first ข้อมูลซิงก์ได้ระหว่างแท็บในเบราว์เซอร์และโปรไฟล์เดียวกัน แต่ยังไม่สามารถซิงก์ครูกับนักเรียนที่ใช้คนละเครื่อง Admin/Teacher PIN เป็นเพียงชั้นป้องกันในเครื่อง ไม่ใช่ระบบยืนยันตัวตนระดับเซิร์ฟเวอร์ การนำไปใช้หลายเครื่องจริงต้องเชื่อม Backend/Auth และฐานข้อมูลส่วนกลาง เช่น Supabase หรือ Firebase
+เวอร์ชันนี้เป็น Classroom Control แบบ Local-first ข้อมูลซิงก์ได้ระหว่างแท็บในเบราว์เซอร์และโปรไฟล์เดียวกัน แต่ยังไม่สามารถซิงก์ครูกับนักเรียนที่ใช้คนละเครื่อง รหัสครูเป็นเพียงชั้นป้องกันในเครื่อง ไม่ใช่ระบบยืนยันตัวตนระดับเซิร์ฟเวอร์ การนำไปใช้หลายเครื่องจริงต้องเชื่อม Backend/Auth และฐานข้อมูลส่วนกลาง เช่น Supabase หรือ Firebase
 
 ไฟล์ระบบหลัก: `src/game/classroom.ts`, `src/game/classroom.test.ts`, `src/screens/ClassroomControl.tsx`, `src/screens/Start.tsx`, `src/types.ts`, `src/store.tsx` และ `src/App.tsx`

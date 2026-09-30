@@ -7,7 +7,7 @@ import { Shell } from '../components/Shell';
 import { Ico } from '../components/icons';
 import { useBuddyTopic } from '../components/Buddy';
 
-const LOS: LOId[] = [1, 2, 3, 4, 5, 6];
+const LOS: LOId[] = [1, 2, 3, 4, 5];
 
 export function Progress() {
   const { state, go } = useStore();

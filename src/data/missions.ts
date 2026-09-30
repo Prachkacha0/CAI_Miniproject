@@ -1,12 +1,11 @@
 import type { LOId, MissionId } from '../types';
 
 export const OBJECTIVES: Record<LOId, { th: string; en: string; short: string }> = {
-  1: { th: 'อธิบายความหมายของ Hardware', en: 'Hardware Meaning', short: 'ความหมาย' },
-  2: { th: 'อธิบายความสำคัญของ Hardware', en: 'Hardware Importance', short: 'ความสำคัญ' },
-  3: { th: 'จำแนกประเภทของ Hardware', en: 'Hardware Categories', short: 'ประเภท' },
-  4: { th: 'อธิบายหน้าที่ของ Hardware', en: 'Hardware Functions', short: 'หน้าที่' },
-  5: { th: 'ระบุ Hardware จากภาพหรืออุปกรณ์', en: 'Hardware Identification', short: 'การระบุ' },
-  6: { th: 'เลือก Hardware ให้เหมาะกับงาน', en: 'Hardware Selection', short: 'การเลือก' },
+  1: { th: 'อธิบายความหมายและความสำคัญของฮาร์ดแวร์', en: 'Hardware Meaning', short: 'ความหมาย' },
+  2: { th: 'จำแนกประเภทฮาร์ดแวร์ตามลักษณะการทำงาน', en: 'Hardware Categories', short: 'ประเภท' },
+  3: { th: 'ระบุชื่อและอธิบายหน้าที่อุปกรณ์พื้นฐาน', en: 'Hardware Functions', short: 'หน้าที่' },
+  4: { th: 'ระบุอุปกรณ์ฮาร์ดแวร์จากภาพหรือของจริง', en: 'Hardware Identification', short: 'การระบุ' },
+  5: { th: 'เลือกฮาร์ดแวร์ให้เหมาะกับลักษณะงาน', en: 'Hardware Selection', short: 'การเลือก' },
 };
 
 export interface MissionMeta {
@@ -25,34 +24,34 @@ export interface MissionMeta {
 
 export const MISSIONS: MissionMeta[] = [
   {
-    id: 1, code: 'M-01', title: 'เปิดแฟ้มคดี Hardware', en: 'Open the Hardware Case File',
-    objective: 'ค้นพบว่า Hardware คืออะไร', lo: 1, gameplay: 'Investigation',
-    skill: 'สำรวจ · เก็บหลักฐาน · จัดกลุ่ม', reward: 'Hardware Evidence ×8', icon: 'folder', accent: 'from-sky-500 to-cyan-400',
+    id: 1, code: 'M-01', title: 'นักสืบตามล่าหลักฐาน', en: 'Hardware Evidence Hunt',
+    objective: 'สำรวจของรอบโต๊ะ แยกฮาร์ดแวร์ที่จับต้องได้ออกจากซอฟต์แวร์และข้อมูล แล้วอธิบายว่าคอมพิวเตอร์ต้องใช้อุปกรณ์จริงทำงานอย่างไร', lo: 1, gameplay: 'ค้นหา · ตรวจของ · คัดแยก',
+    skill: 'สำรวจของในห้อง · เก็บหลักฐาน · ตัดสินใจจัดกลุ่ม', reward: 'แฟ้มคดี Hardware', icon: 'folder', accent: 'from-sky-500 to-cyan-400',
   },
   {
     id: 2, code: 'M-02', title: 'ระบบนี้ขาดอะไร?', en: 'What Is the System Missing?',
-    objective: 'เข้าใจความสำคัญของ Hardware', lo: 2, gameplay: 'System Diagnosis',
-    skill: 'ทดลอง · สังเกตผลกระทบ', reward: 'Diagnostic Evidence', icon: 'power', accent: 'from-violet-500 to-fuchsia-400',
+    objective: 'ทดลองถอดอุปกรณ์ทีละชิ้น สังเกตอาการที่เปลี่ยนไป แล้วจับคู่ปัญหากับหน้าที่ของฮาร์ดแวร์เพื่อสรุปว่าทำไมระบบจึงต้องมีอุปกรณ์แต่ละส่วน', lo: 1, gameplay: 'ทดลอง · สังเกต · กู้ระบบ',
+    skill: 'ถอด/ใส่อุปกรณ์ · อ่านอาการ · ช่วยผู้ใช้แก้ปัญหา', reward: 'บันทึกผลการทดลอง', icon: 'power', accent: 'from-violet-500 to-fuchsia-400',
   },
   {
     id: 3, code: 'M-03', title: 'ตามรอยเส้นทางข้อมูล', en: 'Trace the Data Route',
-    objective: 'จำแนกประเภท Hardware', lo: 3, gameplay: 'System Mapping',
-    skill: 'จำแนก · เชื่อมโยงระบบ', reward: 'Category Evidence ×5', icon: 'route', accent: 'from-amber-500 to-orange-400',
+    objective: 'ลากอุปกรณ์เข้ากลุ่ม Input, Processing, Storage, Output และ Communication จากนั้นเรียงเส้นทางข้อมูลให้ระบบกลับมาทำงาน', lo: 2, gameplay: 'จัดทีมอุปกรณ์ · ต่อสายข้อมูล',
+    skill: 'จัดประเภท · ต่อเส้นทาง · ทดลองรันระบบ', reward: 'เส้นทางข้อมูลสมบูรณ์', icon: 'route', accent: 'from-amber-500 to-orange-400',
   },
   {
     id: 4, code: 'M-04', title: 'ใครทำหน้าที่อะไร?', en: 'Who Does What?',
-    objective: 'เข้าใจหน้าที่ของ Hardware', lo: 4, gameplay: 'Troubleshooting',
-    skill: 'อ่านค่า Diagnostic · วิเคราะห์ · ทดสอบ', reward: 'Badge: Hardware Analyst', icon: 'wrench', accent: 'from-emerald-500 to-teal-400',
+    objective: 'อ่านอาการและค่าจากเครื่องจำลอง เลือกอุปกรณ์ที่เกี่ยวข้อง แล้วอธิบายหน้าที่ของ CPU, RAM, GPU และ Storage ก่อนตัดสินใจแก้ปัญหา', lo: 3, gameplay: 'ภารกิจศูนย์ซ่อมหลายเคส',
+    skill: 'อ่านค่าระบบ · เลือกอะไหล่ · ทดสอบการซ่อม', reward: 'Badge: Hardware Analyst', icon: 'wrench', accent: 'from-emerald-500 to-teal-400',
   },
   {
-    id: 5, code: 'M-05', title: 'ตรวจจับอุปกรณ์ต้องสงสัย', en: 'Identify the Suspect Device',
-    objective: 'ระบุ Hardware จากภาพหรืออุปกรณ์', lo: 5, gameplay: 'Visual Investigation',
-    skill: 'สังเกต · Zoom · Inspect', reward: 'Physical Clue Evidence', icon: 'scan', accent: 'from-rose-500 to-pink-400',
+    id: 5, code: 'M-05', title: 'แฟ้มลับนักสืบอะไหล่', en: 'Parts Detective: Clue Cards',
+    objective: 'อ่านแฟ้มหลักฐานด้านรูปร่าง หน้าที่ และประเภท แล้วเลือกชิ้นส่วนที่ตรงที่สุด คำตอบผิดจะปลดล็อกเบาะแสเพิ่ม', lo: 4, gameplay: 'เกมสืบสวนจากการ์ดหลักฐาน',
+    skill: 'เทียบลักษณะ · ใช้เหตุผล · บริหารจำนวนคำใบ้', reward: 'แฟ้มภาพจำอุปกรณ์', icon: 'scan', accent: 'from-rose-500 to-pink-400',
   },
   {
     id: 6, code: 'M-06', title: 'รับงานจากลูกค้า', en: 'Client Job',
-    objective: 'เลือก Hardware ให้เหมาะกับงาน', lo: 6, gameplay: 'Client Simulation',
-    skill: 'วิเคราะห์ความต้องการ · ชั่งน้ำหนัก Trade-off', reward: 'Badge: Hardware Planner', icon: 'briefcase', accent: 'from-indigo-500 to-blue-400',
+    objective: 'รับโจทย์ลูกค้า อ่านลักษณะงานและงบ เลือกอุปกรณ์ที่จำเป็นให้พอดี แล้วชี้แจงเหตุผลและข้อแลกเปลี่ยน', lo: 5, gameplay: 'เวิร์กช็อปรับออเดอร์ประกอบ PC',
+    skill: 'ประกอบสเปก · คุมงบ · อธิบายเหตุผลให้ลูกค้า', reward: 'Badge: Hardware Planner', icon: 'briefcase', accent: 'from-indigo-500 to-blue-400',
   },
 ];
 

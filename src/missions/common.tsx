@@ -1,13 +1,15 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import confetti from 'canvas-confetti';
-import { ArrowRight, BookOpen, House } from 'lucide-react';
+import { ArrowRight, BookOpen, House, Sparkles, Volume2, VolumeX } from 'lucide-react';
 import type { MissionId, MissionScore } from '../types';
 import { MISSION, OBJECTIVES } from '../data/missions';
 import { canAccessFinal, missionStatus, useStore, avgScore } from '../store';
 import { Bar, Btn, Card, Feedback, Steps } from '../components/ui';
 import { Shell } from '../components/Shell';
 import { BuddyBot } from '../components/BuddyBot';
+import { Ico } from '../components/icons';
+import { setSoundEnabled, soundEnabled } from '../game/sound';
 
 export function clamp(n: number) {
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -20,12 +22,38 @@ export function independence(hints: number) {
 
 export function MissionFrame({ id, steps, step, brief, children }: { id: MissionId; steps: string[]; step: number; brief: ReactNode; children: ReactNode }) {
   const m = MISSION[id];
+  const pct = Math.round(((step + 1) / steps.length) * 100);
+  const [sound, setSound] = useState(() => soundEnabled());
   return (
     <Shell title={`${m.code} · ${m.title}`} subtitle={`${m.gameplay} · LO${m.lo} ${OBJECTIVES[m.lo].en}`} exitTo="home">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="relative mb-5 overflow-hidden rounded-[1.75rem] bg-[#091426] p-4 text-white shadow-xl ring-1 ring-cyan-300/15 sm:p-5">
+        <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(#67e8f9_1px,transparent_1px),linear-gradient(90deg,#67e8f9_1px,transparent_1px)] [background-size:28px_28px]" aria-hidden="true" />
+        <div className="relative flex items-center gap-4">
+          <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${m.accent} shadow-lg`}><Ico name={m.icon} className="h-7 w-7 text-white" /></div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-bold tracking-[.18em] text-cyan-300">FIELD OPERATION · {m.code}</p>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-amber-200"><Sparkles className="h-3.5 w-3.5" /> {m.reward}</span>
+                <button type="button" onClick={() => { const next = !sound; setSound(next); setSoundEnabled(next); }} className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-cyan-100 transition hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-cyan-300" aria-label={sound ? 'ปิดเสียงเอฟเฟกต์' : 'เปิดเสียงเอฟเฟกต์'} title={sound ? 'Sound on' : 'Sound off'}>
+                  {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <h2 className="mt-1 font-display text-lg font-bold sm:text-xl">{m.title}</h2>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Mission stage progress">
+                <motion.div className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300" initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: .5 }} />
+              </div>
+              <span className="whitespace-nowrap text-xs font-bold tabular-nums text-cyan-100">STAGE {step + 1}/{steps.length}</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Steps steps={steps} current={step} />
       </div>
-      <div className="mb-5 flex items-start gap-3 rounded-3xl bg-white/70 p-3 ring-1 ring-slate-100">
+      <div className="mb-5 flex items-start gap-3 rounded-3xl border border-indigo-100 bg-gradient-to-r from-white to-indigo-50/80 p-3 shadow-sm">
         <BuddyBot className="h-10 w-10 shrink-0" />
         <div className="text-sm leading-relaxed text-slate-700">{brief}</div>
       </div>

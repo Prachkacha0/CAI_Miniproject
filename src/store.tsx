@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Classroom, Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TestResult, UserRole } from './types';
+import type { Classroom, Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TeacherAccount, TestResult, UserRole } from './types';
 import { PASS_RATIO } from './data/assessment';
 import { MISSIONS } from './data/missions';
 import { classroomFinalAllowed, classroomLockReason, classroomMissionAllowed, hashStaffPin, normalizeClassroomCode } from './game/classroom';
@@ -13,8 +13,7 @@ function freshState(): GameState {
     version: 1,
     player: null,
     classrooms: {},
-    adminPinHash: null,
-    teacherPinHash: null,
+    teacherAccounts: {},
     preTest: null,
     postTest: null,
     postTestBest: null,
@@ -26,6 +25,20 @@ function freshState(): GameState {
     labViewed: [],
     learnViewed: [],
     certificate: null,
+  };
+}
+
+function migrateTestOutcome(result: TestResult | null | undefined): TestResult | null {
+  if (!result || result.outcomeVersion === 2) return result ?? null;
+  const old = result.byLO as Record<number, { correct: number; total: number }> | undefined;
+  const combine = (...ids: number[]) => ids.reduce((sum, id) => ({
+    correct: sum.correct + (old?.[id]?.correct ?? 0),
+    total: sum.total + (old?.[id]?.total ?? 0),
+  }), { correct: 0, total: 0 });
+  return {
+    ...result,
+    byLO: { 1: combine(1, 2), 2: combine(3), 3: combine(4), 4: combine(5), 5: combine(6) },
+    outcomeVersion: 2,
   };
 }
 
@@ -43,12 +56,32 @@ function load(): GameState {
     } catch {
       try { sessionStorage.removeItem(SESSION_KEY); } catch { /* Ignore unavailable session storage. */ }
     }
-    const legacyPlayer = sessionPlayer ?? parsed.player as GameState['player'] | ({ name: string; group: string; role?: UserRole; classroomCode?: string }) | null;
-    const player = legacyPlayer ? { ...legacyPlayer, role: legacyPlayer.role ?? 'student', classroomCode: legacyPlayer.classroomCode ? normalizeClassroomCode(legacyPlayer.classroomCode) : undefined } : null;
+    const legacyPlayer = sessionPlayer ?? parsed.player as GameState['player'] | ({ name: string; group: string; role?: UserRole | 'admin'; classroomCode?: string }) | null;
+    const player = legacyPlayer ? { ...legacyPlayer, role: legacyPlayer.role === 'admin' ? 'teacher' : legacyPlayer.role ?? 'student', classroomCode: legacyPlayer.classroomCode ? normalizeClassroomCode(legacyPlayer.classroomCode) : undefined } : null;
     if (!sessionPlayer && player) {
       try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(player)); } catch { /* Continue with in-memory migration. */ }
     }
-    return { ...base, ...parsed, player, classrooms: parsed.classrooms ?? {}, missions: { ...base.missions, ...parsed.missions } };
+    const saved = parsed as GameState & { adminPinHash?: string | null; teacherPinHash?: string | null; teacherAccounts?: Record<string, TeacherAccount> };
+    const teacherAccounts = { ...(saved.teacherAccounts ?? {}) };
+    const legacyAccessHash = saved.teacherPinHash ?? saved.adminPinHash;
+    const legacyTeacher = legacyPlayer && (legacyPlayer.role === 'teacher' || legacyPlayer.role === 'admin') ? legacyPlayer : null;
+    const legacyTeacherKey = legacyTeacher?.name.normalize('NFC').trim().toLocaleLowerCase();
+    if (legacyAccessHash && legacyTeacher && legacyTeacherKey && !teacherAccounts[legacyTeacherKey]) {
+      teacherAccounts[legacyTeacherKey] = { name: legacyTeacher.name, passwordHash: legacyAccessHash };
+    }
+    return {
+      ...base,
+      ...parsed,
+      adminPinHash: undefined,
+      teacherPinHash: undefined,
+      teacherAccounts,
+      player,
+      preTest: migrateTestOutcome(parsed.preTest),
+      postTest: migrateTestOutcome(parsed.postTest),
+      postTestBest: migrateTestOutcome(parsed.postTestBest),
+      classrooms: parsed.classrooms ?? {},
+      missions: { ...base.missions, ...parsed.missions },
+    } as GameState;
   } catch {
     return freshState();
   }
@@ -109,8 +142,7 @@ interface Store {
   go: (r: Route) => void;
   back: () => void;
   setPlayer: (name: string, group: string, role: UserRole, classroomCode?: string) => void;
-  setInitialAdminPin: (pin: string) => void;
-  setTeacherPin: (pin: string) => void;
+  registerTeacher: (name: string, password: string) => boolean;
   signOut: () => void;
   createClassroom: (name: string, preferredCode?: string) => string;
   updateClassroom: (code: string, update: Partial<Pick<Classroom, 'unlockedThrough' | 'finalUnlocked' | 'active' | 'name'>>) => void;
@@ -194,12 +226,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return { ...s, player, classrooms: { ...s.classrooms, [classroomCode!]: { ...currentRoom, members: [...currentRoom.members, name], updatedAt: Date.now() } } };
       });
     },
-    setInitialAdminPin: (pin) => patch((s) => (s.adminPinHash ? s : { ...s, adminPinHash: hashStaffPin(pin) })),
-    setTeacherPin: (pin) => patch((s) => (s.player?.role === 'admin' ? { ...s, teacherPinHash: hashStaffPin(pin) } : s)),
+    registerTeacher: (name, password) => {
+      const key = name.normalize('NFC').trim().toLocaleLowerCase();
+      if (!key || state.teacherAccounts[key]) return false;
+      patch((s) => s.teacherAccounts[key] ? s : { ...s, teacherAccounts: { ...s.teacherAccounts, [key]: { name: name.trim(), passwordHash: hashStaffPin(password) } } });
+      return true;
+    },
     signOut: () => {
       try { sessionStorage.removeItem(SESSION_KEY); } catch { /* Ignore unavailable storage. */ }
       if (state.player?.role === 'student') {
-        setState((s) => ({ ...freshState(), classrooms: s.classrooms, adminPinHash: s.adminPinHash, teacherPinHash: s.teacherPinHash }));
+        setState((s) => ({ ...freshState(), classrooms: s.classrooms, teacherAccounts: s.teacherAccounts }));
         try { localStorage.removeItem('hardware-quest.builder.v1'); } catch { /* Ignore unavailable storage. */ }
       } else {
         patch((s) => ({ ...s, player: null }));
@@ -225,7 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateClassroom: (rawCode, update) => patch((s) => {
       const code = normalizeClassroomCode(rawCode);
       const room = s.classrooms[code];
-      if (!room || !s.player || (s.player.role !== 'admin' && (s.player.role !== 'teacher' || room.teacherName !== s.player.name))) return s;
+      if (!room || s.player?.role !== 'teacher' || room.teacherName !== s.player.name) return s;
       const unlockedThrough = update.unlockedThrough === undefined ? room.unlockedThrough : Math.max(0, Math.min(6, Math.round(update.unlockedThrough)));
       return { ...s, classrooms: { ...s.classrooms, [code]: { ...room, ...update, unlockedThrough, finalUnlocked: unlockedThrough < 6 ? false : (update.finalUnlocked ?? room.finalUnlocked), updatedAt: Date.now() } } };
     }),
@@ -323,7 +359,8 @@ export type LOStatus = 'not-started' | 'practiced' | 'achieved';
 
 /** Per-objective status from this player's own play data (not research data). */
 export function loStatus(s: GameState, lo: LOId): { status: LOStatus; pct: number } {
-  const practiced = s.missions[lo as MissionId].completed;
+  const missionIds: Record<LOId, MissionId[]> = { 1: [1, 2], 2: [3], 3: [4], 4: [5], 5: [6] };
+  const practiced = missionIds[lo].every((id) => s.missions[id].completed);
   const post = s.postTestBest?.byLO[lo];
   const postPct = post ? post.correct / post.total : 0;
   if (practiced && post && postPct >= 0.5) return { status: 'achieved', pct: 100 };
@@ -354,7 +391,7 @@ export function technicianProfile(s: GameState) {
 }
 
 export function gradeTest(questions: { lo: LOId; answer: number }[], answers: number[]): TestResult {
-  const byLO = { 1: { correct: 0, total: 0 }, 2: { correct: 0, total: 0 }, 3: { correct: 0, total: 0 }, 4: { correct: 0, total: 0 }, 5: { correct: 0, total: 0 }, 6: { correct: 0, total: 0 } } as TestResult['byLO'];
+  const byLO = { 1: { correct: 0, total: 0 }, 2: { correct: 0, total: 0 }, 3: { correct: 0, total: 0 }, 4: { correct: 0, total: 0 }, 5: { correct: 0, total: 0 } } as TestResult['byLO'];
   let score = 0;
   questions.forEach((q, i) => {
     byLO[q.lo].total++;
@@ -363,5 +400,5 @@ export function gradeTest(questions: { lo: LOId; answer: number }[], answers: nu
       score++;
     }
   });
-  return { score, total: questions.length, byLO, answers, at: Date.now() };
+  return { score, total: questions.length, byLO, answers, at: Date.now(), outcomeVersion: 2 };
 }

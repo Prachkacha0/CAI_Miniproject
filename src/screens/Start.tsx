@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, GraduationCap, KeyRound, Presentation, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { ArrowRight, GraduationCap, KeyRound, Presentation, TriangleAlert } from 'lucide-react';
 import { hashStaffPin, isStaff, normalizeClassroomCode } from '../game/classroom';
 import type { UserRole } from '../types';
 import { useStore } from '../store';
@@ -10,17 +10,17 @@ import { BuddyBot } from '../components/BuddyBot';
 const ROLES: { id: UserRole; label: string; detail: string; Icon: typeof GraduationCap }[] = [
   { id: 'student', label: 'นักเรียน', detail: 'เรียนอิสระหรือเข้าห้องด้วยรหัส', Icon: GraduationCap },
   { id: 'teacher', label: 'ครูผู้สอน', detail: 'สร้างห้องและควบคุมการเปิดด่าน', Icon: Presentation },
-  { id: 'admin', label: 'ผู้ดูแลระบบ', detail: 'ดูแลและควบคุมทุกห้องเรียน', Icon: ShieldCheck },
 ];
 
 export function Start() {
-  const { setPlayer, setInitialAdminPin, go, state } = useStore();
+  const { setPlayer, registerTeacher, go, state } = useStore();
   const [role, setRole] = useState<UserRole>(state.player?.role ?? 'student');
   const [name, setName] = useState(state.player?.name ?? '');
   const [group, setGroup] = useState(state.player?.group ?? '');
   const [classroomCode, setClassroomCode] = useState(state.player?.classroomCode ?? '');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [teacherMode, setTeacherMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState('');
   const ok = name.trim().length >= 2;
 
@@ -28,23 +28,27 @@ export function Start() {
     if (!ok) return;
     const code = normalizeClassroomCode(classroomCode);
     if (isStaff(role)) {
-      const expectedPinHash = role === 'admin' ? state.adminPinHash : state.teacherPinHash;
-      if (!/^\d{4,8}$/.test(pin)) {
-        setError(`${role === 'admin' ? 'Admin' : 'Teacher'} PIN ต้องเป็นตัวเลข 4–8 หลัก`);
+      if (pin.trim().length < 4) {
+        setError('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
         return;
       }
-      if (!expectedPinHash) {
-        if (role !== 'admin') {
-          setError('ผู้ดูแลระบบยังไม่ได้กำหนด Teacher PIN');
+      const accountKey = name.normalize('NFC').trim().toLocaleLowerCase();
+      const account = state.teacherAccounts[accountKey];
+      if (teacherMode === 'register') {
+        if (account) {
+          setError('ชื่อนี้มีบัญชีครูแล้ว กรุณาเข้าสู่ระบบแทน');
           return;
         }
         if (pin !== confirmPin) {
-          setError('Admin PIN และช่องยืนยันไม่ตรงกัน');
+          setError('รหัสผ่านและช่องยืนยันไม่ตรงกัน');
           return;
         }
-        setInitialAdminPin(pin);
-      } else if (hashStaffPin(pin) !== expectedPinHash) {
-        setError(`${role === 'admin' ? 'Admin' : 'Teacher'} PIN ไม่ถูกต้อง`);
+        if (!registerTeacher(name.trim(), pin)) {
+          setError('สมัครบัญชีไม่สำเร็จ ชื่อนี้อาจถูกใช้แล้ว');
+          return;
+        }
+      } else if (!account || hashStaffPin(pin) !== account.passwordHash) {
+        setError('ไม่พบบัญชีครูหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบข้อมูลหรือสมัครบัญชีใหม่');
         return;
       }
     }
@@ -53,7 +57,8 @@ export function Start() {
       return;
     }
     setError('');
-    setPlayer(name.trim(), group.trim(), role, role === 'student' ? code : undefined);
+    const teacherAccount = role === 'teacher' ? state.teacherAccounts[name.normalize('NFC').trim().toLocaleLowerCase()] : undefined;
+    setPlayer(teacherAccount?.name ?? name.trim(), group.trim(), role, role === 'student' ? code : undefined);
     go(role === 'student' ? (state.preTest ? { name: 'home' } : { name: 'pretest' }) : { name: 'classroom' });
   };
 
@@ -70,12 +75,17 @@ export function Start() {
         <form className="mt-5 space-y-4 rounded-3xl bg-white/10 p-4 ring-1 ring-white/15 sm:p-5" onSubmit={(event) => { event.preventDefault(); begin(); }}>
           <fieldset>
             <legend className="mb-2 text-sm font-semibold text-indigo-100">เข้าสู่ระบบในบทบาท</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               {ROLES.map((item) => <button key={item.id} type="button" disabled={!!state.player && item.id !== state.player.role} aria-pressed={role === item.id} onClick={() => { setRole(item.id); setError(''); setPin(''); setConfirmPin(''); }} className={cx('min-h-24 cursor-pointer rounded-2xl p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-40', role === item.id ? 'bg-white text-indigo-950 shadow-lg' : 'bg-white/5 text-white ring-1 ring-white/15 hover:bg-white/10')}><item.Icon className={cx('h-6 w-6', role === item.id ? 'text-indigo-600' : 'text-cyan-300')} aria-hidden="true" /><b className="mt-2 block">{item.label}</b><span className={cx('text-xs', role === item.id ? 'text-slate-500' : 'text-indigo-200')}>{item.detail}</span></button>)}
             </div>
           </fieldset>
 
-          <label className="block"><span className="mb-1 block text-sm font-semibold text-indigo-100">ชื่อ-นามสกุล</span><input value={name} onChange={(event) => setName(event.target.value)} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder={role === 'student' ? 'ชื่อสำหรับโปรไฟล์และใบประกาศ' : 'ชื่อครูหรือผู้ดูแล'} autoComplete="name" required /></label>
+          {role === 'teacher' && <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-950/25 p-1.5" role="group" aria-label="การใช้งานครู">
+            <button type="button" aria-pressed={teacherMode === 'login'} onClick={() => { setTeacherMode('login'); setError(''); }} className={cx('min-h-11 rounded-xl px-3 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-cyan-300', teacherMode === 'login' ? 'bg-white text-indigo-950 shadow' : 'text-indigo-100 hover:bg-white/10')}>เข้าสู่ระบบ</button>
+            <button type="button" aria-pressed={teacherMode === 'register'} onClick={() => { setTeacherMode('register'); setError(''); }} className={cx('min-h-11 rounded-xl px-3 text-sm font-bold transition focus-visible:outline-2 focus-visible:outline-cyan-300', teacherMode === 'register' ? 'bg-white text-indigo-950 shadow' : 'text-indigo-100 hover:bg-white/10')}>สมัครครู</button>
+          </div>}
+
+          <label className="block"><span className="mb-1 block text-sm font-semibold text-indigo-100">{role === 'teacher' ? 'ชื่อบัญชีครู' : 'ชื่อ-นามสกุล'}</span><input value={name} onChange={(event) => setName(event.target.value)} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder={role === 'student' ? 'ชื่อสำหรับโปรไฟล์และใบประกาศ' : 'ใช้ชื่อนี้เข้าสู่ระบบครั้งถัดไป'} autoComplete="name" required /></label>
 
           {role === 'student' && <div className="grid gap-3 sm:grid-cols-2">
             <label className="block"><span className="mb-1 block text-sm font-semibold text-indigo-100">กลุ่มเรียน (โหมดอิสระ)</span><input value={group} onChange={(event) => setGroup(event.target.value)} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder="เช่น ปวช.1/2" /></label>
@@ -83,16 +93,16 @@ export function Start() {
           </div>}
 
           {isStaff(role) && <div className="rounded-2xl bg-slate-950/30 p-3 ring-1 ring-white/10">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-cyan-200"><KeyRound className="h-4 w-4" /> {role === 'admin' ? (state.adminPinHash ? 'ยืนยัน Admin PIN' : 'ตั้ง Admin PIN ครั้งแรก') : (state.teacherPinHash ? 'ยืนยัน Teacher PIN' : 'รอผู้ดูแลตั้ง Teacher PIN')}</div>
-            <div className={cx('grid gap-3', !state.adminPinHash && role === 'admin' && 'sm:grid-cols-2')}>
-              <label><span className="mb-1 block text-sm text-indigo-100">{role === 'admin' ? 'Admin PIN' : 'Teacher PIN'}</span><input type="password" inputMode="numeric" autoComplete={(role === 'admin' ? state.adminPinHash : state.teacherPinHash) ? 'current-password' : 'new-password'} value={pin} onChange={(event) => { setPin(event.target.value.replace(/\D/g, '').slice(0, 8)); setError(''); }} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder="ตัวเลข 4–8 หลัก" /></label>
-              {!state.adminPinHash && role === 'admin' && <label><span className="mb-1 block text-sm text-indigo-100">ยืนยัน Admin PIN</span><input type="password" inputMode="numeric" autoComplete="new-password" value={confirmPin} onChange={(event) => { setConfirmPin(event.target.value.replace(/\D/g, '').slice(0, 8)); setError(''); }} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder="กรอก PIN ซ้ำ" /></label>}
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-cyan-200"><KeyRound className="h-4 w-4" /> {teacherMode === 'register' ? 'สร้างรหัสผ่านบัญชีครู' : 'รหัสผ่านบัญชีครู'}</div>
+            <div className={cx('grid gap-3', teacherMode === 'register' && 'sm:grid-cols-2')}>
+              <label><span className="mb-1 block text-sm text-indigo-100">รหัสผ่าน</span><input type="password" autoComplete={teacherMode === 'register' ? 'new-password' : 'current-password'} value={pin} onChange={(event) => { setPin(event.target.value); setError(''); }} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder="พิมพ์ได้อิสระ (อย่างน้อย 4 ตัว)" /></label>
+              {teacherMode === 'register' && <label><span className="mb-1 block text-sm text-indigo-100">ยืนยันรหัสผ่าน</span><input type="password" autoComplete="new-password" value={confirmPin} onChange={(event) => { setConfirmPin(event.target.value); setError(''); }} className="h-12 w-full rounded-2xl bg-white px-4 text-base text-slate-900 outline-none ring-2 ring-transparent focus:ring-cyan-400" placeholder="พิมพ์รหัสเดิมอีกครั้ง" /></label>}
             </div>
-            <p className="mt-2 text-xs text-indigo-200">PIN ถูกเก็บเป็นค่าแฮชในเบราว์เซอร์ เป็นชั้นป้องกันสำหรับต้นแบบ Local-first และไม่ทดแทนระบบยืนยันตัวตนจากเซิร์ฟเวอร์</p>
+            <p className="mt-2 text-xs text-indigo-200">บัญชีครูเก็บในเบราว์เซอร์นี้เท่านั้น ใช้ชื่อบัญชีและรหัสผ่านเดิมเมื่อกลับมาเข้าใช้</p>
           </div>}
 
           {error && <p role="alert" className="rounded-2xl bg-rose-500/20 px-4 py-3 text-sm font-semibold text-rose-100 ring-1 ring-rose-400/40">{error}</p>}
-          <Btn type="submit" disabled={!ok} className="w-full bg-gradient-to-r from-cyan-500 to-violet-500 py-3 text-lg">{role === 'student' ? 'เข้าสู่เกม' : 'เปิดศูนย์ควบคุม'} <ArrowRight className="h-5 w-5" aria-hidden="true" /></Btn>
+          <Btn type="submit" disabled={!ok} className="w-full bg-gradient-to-r from-cyan-500 to-violet-500 py-3 text-lg">{role === 'student' ? 'เข้าสู่เกม' : teacherMode === 'register' ? 'สมัครบัญชีครู' : 'เข้าสู่ศูนย์ควบคุม'} <ArrowRight className="h-5 w-5" aria-hidden="true" /></Btn>
         </form>
         <p className="mt-4 text-center text-xs text-indigo-200/80">ระบบห้องเรียนรุ่นนี้ซิงก์ระหว่างแท็บในเบราว์เซอร์เดียวกัน การใช้งานข้ามเครื่องต้องเชื่อมต่อฐานข้อมูลส่วนกลาง</p>
       </motion.div>

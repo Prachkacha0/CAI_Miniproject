@@ -9,7 +9,7 @@ import { Bar, Btn, Card, Feedback, cx } from '../components/ui';
 import { Shell } from '../components/Shell';
 import { useBuddyTopic } from '../components/Buddy';
 
-const LOS: LOId[] = [1, 2, 3, 4, 5, 6];
+const LOS: LOId[] = [1, 2, 3, 4, 5];
 
 export function Assessment({ kind }: { kind: 'pre' | 'post' }) {
   const { state, savePreTest, savePostTest, go } = useStore();

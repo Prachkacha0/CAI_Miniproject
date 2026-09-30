@@ -5,7 +5,7 @@ export function normalizeClassroomCode(value: string) {
 }
 
 export function isStaff(role?: UserRole) {
-  return role === 'teacher' || role === 'admin';
+  return role === 'teacher';
 }
 
 export function hashStaffPin(pin: string) {
