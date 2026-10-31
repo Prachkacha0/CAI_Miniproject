@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Classroom, Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TeacherAccount, TestResult, UserRole } from './types';
+import type { AssemblyOrder, Classroom, Evidence, FinalCaseRecord, GameState, LOId, MissionId, MissionScore, ReflectionData, TeacherAccount, TestResult, UserRole } from './types';
 import { PASS_RATIO } from './data/assessment';
 import { MISSIONS } from './data/missions';
 import { classroomFinalAllowed, classroomLockReason, classroomMissionAllowed, hashStaffPin, normalizeClassroomCode } from './game/classroom';
@@ -18,6 +18,8 @@ function freshState(): GameState {
     postTest: null,
     postTestBest: null,
     missions: Object.fromEntries(MISSION_IDS.map((id) => [id, { completed: false, plays: 0, hintsUsed: 0 }])) as GameState['missions'],
+    assemblyOrder: null,
+    builderCompleted: false,
     finalCase: { completed: false },
     reflection: null,
     evidence: [],
@@ -149,6 +151,8 @@ interface Store {
   savePreTest: (t: TestResult) => void;
   savePostTest: (t: TestResult) => void;
   completeMission: (id: MissionId, score: MissionScore, meta?: Record<string, unknown>) => void;
+  saveAssemblyOrder: (order: AssemblyOrder) => void;
+  markBuilderComplete: () => void;
   addHint: (id: MissionId | 'final') => void;
   addEvidence: (e: Omit<Evidence, 'at'>) => boolean;
   completeFinal: (rec: Omit<FinalCaseRecord, 'completed' | 'at'>) => void;
@@ -278,6 +282,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         missions: { ...s.missions, [id]: { ...m, completed: true, plays: m.plays + 1, best: better(m.best, score), meta: { ...m.meta, ...meta } } },
       };
     }),
+    saveAssemblyOrder: (order) => patch((s) => ({ ...s, assemblyOrder: order, builderCompleted: false })),
+    markBuilderComplete: () => patch((s) => s.builderCompleted ? s : { ...s, builderCompleted: true }),
     addHint: (id) => patch((s) => {
       if (id === 'final') return { ...s, buddyUses: s.buddyUses + 1 };
       return { ...s, missions: { ...s.missions, [id]: { ...s.missions[id], hintsUsed: s.missions[id].hintsUsed + 1 } } };
@@ -337,6 +343,7 @@ export function currentStep(s: GameState): { label: string; route: Route; blocke
   if (next) return { label: `${next.code} ${next.title}`, route: { name: 'mission', id: next.id } };
   const remaining = MISSIONS.find((m) => !s.missions[m.id].completed);
   if (remaining) return { label: classroomLockReason(s, remaining.id), route: { name: 'home' }, blocked: true };
+  if (!s.builderCompleted) return { label: 'M-07 ประกอบคอมให้พร้อมใช้งาน', route: { name: 'builder' } };
   if (!s.finalCase.completed && canAccessFinal(s)) return { label: 'Final Case: กู้ระบบห้องทะเบียน', route: { name: 'final' } };
   if (!s.finalCase.completed) return { label: classroomLockReason(s), route: { name: 'home' }, blocked: true };
   if (!testPassed(s.postTestBest)) return { label: 'Post-Test', route: { name: 'posttest' } };

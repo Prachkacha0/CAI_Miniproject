@@ -94,6 +94,14 @@ export interface FinalCaseRecord {
   at?: number;
 }
 
+export interface AssemblyOrder {
+  id: string;
+  customerName: string;
+  role: string;
+  scenarioId: string;
+  partIds: Record<string, string>;
+}
+
 export interface GameState {
   version: 1;
   player: PlayerProfile | null;
@@ -103,6 +111,8 @@ export interface GameState {
   postTest: TestResult | null; // latest attempt
   postTestBest: TestResult | null;
   missions: Record<MissionId, MissionRecord>;
+  assemblyOrder: AssemblyOrder | null;
+  builderCompleted: boolean;
   finalCase: FinalCaseRecord;
   reflection: ReflectionData | null;
   evidence: Evidence[];

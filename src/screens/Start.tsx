@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, GraduationCap, KeyRound, Presentation, TriangleAlert } from 'lucide-react';
+import { ArrowRight, GraduationCap, KeyRound, Presentation, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { hashStaffPin, isStaff, normalizeClassroomCode } from '../game/classroom';
 import type { UserRole } from '../types';
 import { useStore } from '../store';
@@ -23,6 +23,12 @@ export function Start() {
   const [teacherMode, setTeacherMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState('');
   const ok = name.trim().length >= 2;
+
+  const quickEnter = (testRole: UserRole) => {
+    const testName = testRole === 'student' ? 'นักเรียนทดสอบ' : 'ครูทดสอบ';
+    setPlayer(testName, testRole === 'student' ? 'กลุ่มทดสอบ' : '', testRole);
+    go(testRole === 'student' ? (state.preTest ? { name: 'home' } : { name: 'pretest' }) : { name: 'classroom' });
+  };
 
   const begin = () => {
     if (!ok) return;
@@ -104,6 +110,14 @@ export function Start() {
           {error && <p role="alert" className="rounded-2xl bg-rose-500/20 px-4 py-3 text-sm font-semibold text-rose-100 ring-1 ring-rose-400/40">{error}</p>}
           <Btn type="submit" disabled={!ok} className="w-full bg-gradient-to-r from-cyan-500 to-violet-500 py-3 text-lg">{role === 'student' ? 'เข้าสู่เกม' : teacherMode === 'register' ? 'สมัครบัญชีครู' : 'เข้าสู่ศูนย์ควบคุม'} <ArrowRight className="h-5 w-5" aria-hidden="true" /></Btn>
         </form>
+        {import.meta.env.DEV && <section className="mt-4 rounded-3xl border border-dashed border-cyan-300/40 bg-slate-950/25 p-4" aria-labelledby="quick-test-title">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-cyan-100"><ShieldCheck className="h-4 w-4" aria-hidden="true" /><h2 id="quick-test-title">เข้าแบบรวดเร็วสำหรับทดสอบ</h2><span className="ml-auto rounded-full bg-amber-300/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-200">Dev only</span></div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Btn type="button" variant="secondary" onClick={() => quickEnter('student')} className="min-h-12 border-0 bg-cyan-50 text-indigo-950 hover:bg-white"><GraduationCap className="h-5 w-5 text-cyan-700" aria-hidden="true" /> ทดสอบในบทบาทนักเรียน</Btn>
+            <Btn type="button" variant="secondary" onClick={() => quickEnter('teacher')} className="min-h-12 border-0 bg-violet-50 text-indigo-950 hover:bg-white"><Presentation className="h-5 w-5 text-violet-700" aria-hidden="true" /> ทดสอบในบทบาทครู</Btn>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-indigo-200">ทางลัดนี้ข้ามการกรอกข้อมูลและรหัสผ่าน แสดงเฉพาะตอนรันโหมดพัฒนา และไม่รวมอยู่ใน production build</p>
+        </section>}
         <p className="mt-4 text-center text-xs text-indigo-200/80">ระบบห้องเรียนรุ่นนี้ซิงก์ระหว่างแท็บในเบราว์เซอร์เดียวกัน การใช้งานข้ามเครื่องต้องเชื่อมต่อฐานข้อมูลส่วนกลาง</p>
       </motion.div>
     </div>

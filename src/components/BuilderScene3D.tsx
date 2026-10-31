@@ -19,6 +19,7 @@ interface SceneProps {
   build: Build;
   selectedId: string | null;
   issues: BuildIssue[];
+  caseOpen?: boolean;
   disabled?: boolean;
   onInstall: (category: PartCategory, partId: string) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -102,7 +103,7 @@ function Workshop(props: SceneProps) {
   return (
     <>
       <Workbench />
-      <ComputerCase installed={!!props.build.case && installing?.category !== 'case'} color={props.build.case?.color} onClick={() => beginInstall('case')} active={selected?.category === 'case' && !installing && !props.disabled} />
+      <ComputerCase installed={!!props.build.case && installing?.category !== 'case'} color={props.build.case?.color} open={props.caseOpen ?? true} onClick={() => beginInstall('case')} active={selected?.category === 'case' && !installing && !props.disabled} />
       {CATEGORY_ORDER.filter((category) => category !== 'case').map((category) => (
         <Slot3D
           key={category}
@@ -162,7 +163,7 @@ function Workbench() {
   );
 }
 
-function ComputerCase({ installed, color, active, onClick }: { installed: boolean; color?: string; active: boolean; onClick: () => void }) {
+function ComputerCase({ installed, color, active, open, onClick }: { installed: boolean; color?: string; active: boolean; open: boolean; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
   useCursor(hovered && active);
   const frameColor = installed ? color ?? '#64748b' : active ? '#22d3ee' : '#64748b';
@@ -173,6 +174,10 @@ function ComputerCase({ installed, color, active, onClick }: { installed: boolea
       <FramePiece position={[0, -2.18, 0]} size={[6.65, 0.22, 1.65]} color={frameColor} glow={active || hovered} />
       <FramePiece position={[-3.22, 0, 0]} size={[0.22, 4.55, 1.65]} color={frameColor} glow={active || hovered} />
       <FramePiece position={[3.22, 0, 0]} size={[0.22, 4.55, 1.65]} color={frameColor} glow={active || hovered} />
+      {!open && <group position={[0, 0, 0.82]}>
+        <mesh><boxGeometry args={[6.08, 4.05, 0.075]} /><meshPhysicalMaterial color="#8ca9b8" metalness={0.48} roughness={0.22} transmission={0.32} thickness={0.08} transparent opacity={0.78} /></mesh>
+        {[[-2.82, -1.78], [2.82, -1.78], [-2.82, 1.78], [2.82, 1.78]].map(([x, y], index) => <mesh key={index} position={[x, y, 0.052]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.075, 0.075, 0.045, 12]} /><meshStandardMaterial color="#d3dbe1" metalness={0.92} roughness={0.22} /></mesh>)}
+      </group>}
       {!installed && <mesh position={[0, 0, 0.15]}><boxGeometry args={[6.2, 4.15, 1.2]} /><meshBasicMaterial color={active ? '#22d3ee' : '#475569'} transparent opacity={active ? 0.11 : 0.045} wireframe /></mesh>}
       {(active || hovered) && <Html position={[0, 2.65, 0]} center zIndexRange={[1, 0]}><SceneLabel tone="cyan">ติดตั้งเคส</SceneLabel></Html>}
     </group>

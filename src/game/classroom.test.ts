@@ -13,6 +13,8 @@ function state(overrides: Partial<GameState> = {}): GameState {
     postTest: null,
     postTestBest: null,
     missions: Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, { completed: false, plays: 0, hintsUsed: 0 }])) as GameState['missions'],
+    assemblyOrder: null,
+    builderCompleted: false,
     finalCase: { completed: false },
     reflection: null,
     evidence: [],

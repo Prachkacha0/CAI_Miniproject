@@ -1,347 +1,153 @@
-import { useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, Cloud, Hand, PackageCheck, Search } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Check, Hand, Keyboard, PackageCheck, Search, Sparkles } from 'lucide-react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useStore } from '../store';
-import { Btn, Card, Feedback, Modal, cx, type FeedbackKind } from '../components/ui';
-import { Ico } from '../components/icons';
+import { Btn, Card, Feedback, cx, type FeedbackKind } from '../components/ui';
 import { useBuddyTopic } from '../components/Buddy';
 import { MissionComplete, MissionFrame, clamp, independence } from './common';
 import { useMissionHints } from './useMissionHints';
-import { Quiz } from './Quiz';
+import type { WorkshopClue } from '../components/Mission1Workshop3D';
 
-interface LabObject {
-  id: string;
-  name: string;
-  en: string;
-  icon: string;
-  physical: boolean;
-  where: string;
-  touch: string;
-  observe: string;
-}
+const Mission1Workshop3D = lazy(() => import('../components/Mission1Workshop3D').then((module) => ({ default: module.Mission1Workshop3D })));
 
-const OBJECTS: LabObject[] = [
-  { id: 'monitor', name: 'จอภาพ', en: 'Monitor', icon: 'monitor', physical: true, where: 'วางอยู่บนโต๊ะ', touch: 'แตะได้ มีน้ำหนักประมาณ 3 กก.', observe: 'มีสายไฟและสายสัญญาณต่อเข้ากับเครื่อง' },
-  { id: 'keyboard', name: 'แป้นพิมพ์', en: 'Keyboard', icon: 'keyboard', physical: true, where: 'วางอยู่หน้าจอภาพ', touch: 'กดได้ ทำจากพลาสติก', observe: 'มีปุ่มหลายสิบปุ่ม ต่อสาย USB' },
-  { id: 'mouse', name: 'เมาส์', en: 'Mouse', icon: 'mouse', physical: true, where: 'อยู่ข้างแป้นพิมพ์', touch: 'หยิบได้ พอดีมือ', observe: 'มีปุ่มคลิกและลูกกลิ้ง' },
-  { id: 'ram', name: 'แรม', en: 'RAM', icon: 'memory', physical: true, where: 'อยู่ในเคส เสียบบนเมนบอร์ด', touch: 'ถอดออกมาถือได้ เป็นแผงวงจร', observe: 'มีชิปสีดำเรียงกัน ขาสีทอง' },
-  { id: 'ssd', name: 'เอสเอสดี', en: 'SSD', icon: 'save', physical: true, where: 'อยู่ในเคส', touch: 'ถอดออกมาถือได้ แผ่นเล็กบาง', observe: 'มีชิปและหัวเสียบ' },
-  { id: 'browser', name: 'เว็บเบราว์เซอร์', en: 'Browser', icon: 'browser', physical: false, where: 'ปรากฏบนหน้าจอเมื่อเปิดโปรแกรม', touch: 'แตะไม่ได้ — มองเห็นแต่บนจอ', observe: 'เป็นโปรแกรมที่ติดตั้งและเปิดใช้งาน' },
-  { id: 'file', name: 'ไฟล์รายงาน', en: 'File', icon: 'file', physical: false, where: 'อยู่ในโฟลเดอร์ Documents', touch: 'แตะไม่ได้ — เป็นข้อมูลที่ถูกบันทึกไว้', observe: 'คัดลอก ย้าย ลบได้ด้วยคำสั่ง' },
-  { id: 'os', name: 'ระบบปฏิบัติการ', en: 'Operating System', icon: 'os', physical: false, where: 'ทำงานอยู่เบื้องหลังตั้งแต่เปิดเครื่อง', touch: 'แตะไม่ได้ — เป็นชุดคำสั่ง', observe: 'ติดตั้งใหม่หรืออัปเดตได้โดยไม่ต้องเปลี่ยนชิ้นส่วน' },
+const CLUES: WorkshopClue[] = [
+  { id: 'monitor', name: 'จอภาพ', en: 'Monitor', model: 'monitor', physical: true, position: [-4.7, 0.9, -5.9], where: 'โต๊ะประกอบฝั่งซ้าย', touch: 'เป็นอุปกรณ์จริง มีน้ำหนักและหยิบย้ายได้', observe: 'มีแผงจอ สายไฟ และช่องต่อสัญญาณภาพ' },
+  { id: 'keyboard', name: 'แป้นพิมพ์', en: 'Keyboard', model: 'keyboard', physical: true, position: [-3.8, 0.9, -5.25], where: 'หน้าเครื่องทดสอบ', touch: 'กดปุ่มบนอุปกรณ์ได้จริง', observe: 'มีปุ่มหลายแถวและเชื่อมต่อกับคอมพิวเตอร์' },
+  { id: 'mouse', name: 'เมาส์', en: 'Mouse', model: 'mouse', physical: true, position: [-2.6, 0.9, -5.25], where: 'ข้างแป้นพิมพ์', touch: 'หยิบจับและขยับบนโต๊ะได้', observe: 'มีปุ่มคลิกกับล้อเลื่อน' },
+  { id: 'ram', name: 'หน่วยความจำแรม', en: 'RAM', model: 'ram', physical: true, position: [5.2, 0.97, -6.4], where: 'ถาดอะไหล่บนโต๊ะด้านขวา', touch: 'เป็นแผงวงจรที่ถอดออกมาถือได้', observe: 'มีชิปสีดำเรียงอยู่และมีร่องบาก/ขาสัมผัสสีทอง' },
+  { id: 'ssd', name: 'เอสเอสดีแบบพกพา', en: 'External SSD', model: 'ssd', physical: true, position: [6.7, 0.88, 0.1], where: 'ชั้นอะไหล่ด้านขวา', touch: 'เป็นอุปกรณ์เก็บข้อมูลจริง ถอดเปลี่ยนได้', observe: 'ตัวไดรฟ์มีชิปควบคุมและขั้วต่อ USB' },
+  { id: 'browser', name: 'เว็บเบราว์เซอร์', en: 'Browser', model: 'browser', physical: false, position: [0.7, 1.9, -7.35], where: 'หน้าจอโฮโลแกรมบนโต๊ะกลาง', touch: 'เป็นโปรแกรมที่มองเห็นผ่านหน้าจอ ไม่ใช่ชิ้นส่วนที่ถอดถือได้', observe: 'เปิดเว็บไซต์ได้ แต่ต้องอาศัยคอมพิวเตอร์และจอภาพ' },
+  { id: 'file', name: 'ไฟล์รายงาน', en: 'Report File', model: 'file', physical: false, position: [-7.45, 1.08, 0.1], where: 'จอแสดงงานบนตู้เก็บอุปกรณ์', touch: 'เป็นข้อมูลดิจิทัล ย้ายหรือลบได้ด้วยคำสั่ง', observe: 'ไอคอนกระดาษบนจอแทนข้อมูล ไม่ใช่กระดาษจริง' },
+  { id: 'os', name: 'ระบบปฏิบัติการ', en: 'Operating System', model: 'os', physical: false, position: [2.5, 1.5, 5.2], where: 'แผงข้อมูลจำลองหน้าโต๊ะบริการ', touch: 'เป็นชุดคำสั่ง ไม่สามารถหยิบออกมาเป็นชิ้นส่วนได้', observe: 'จัดการอุปกรณ์และช่วยให้โปรแกรมทำงาน' },
 ];
 
-type Bin = 'physical' | 'virtual';
-
-const STEPS = ['Inspect', 'Collect Evidence', 'Classify', 'Conclude'];
+type Direction = 'forward' | 'back' | 'left' | 'right';
+const STEPS = ['เดินสำรวจ', 'ตรวจและเก็บหลักฐาน', 'สรุปงานช่าง'];
 
 export function Mission1() {
   const { addEvidence } = useStore();
   const hints = useMissionHints(1);
-  const [phase, setPhase] = useState<'investigate' | 'classify' | 'conclude' | 'done'>('investigate');
-  const [inspecting, setInspecting] = useState<LabObject | null>(null);
-  const [inspected, setInspected] = useState<string[]>([]);
-  const [collected, setCollected] = useState<string[]>([]);
-  const [fb, setFb] = useState<{ kind: FeedbackKind; text: string } | null>(null);
-  const [sel, setSel] = useState<string | null>(null);
-  const [bins, setBins] = useState<Record<string, Bin>>({});
-  const [checks, setChecks] = useState(0);
-  const [firstCorrect, setFirstCorrect] = useState<number | null>(null);
-  const [wrongIds, setWrongIds] = useState<string[]>([]);
-  const [q1, setQ1] = useState<number | null>(null);
-  const [q1Tries, setQ1Tries] = useState(0);
-  const [q2, setQ2] = useState<number | null>(null);
-  const [q2Tries, setQ2Tries] = useState(0);
+  const [found, setFound] = useState<string[]>([]);
+  const [nearId, setNearId] = useState<string | null>(null);
+  const [inspectId, setInspectId] = useState<string | null>(null);
+  const [pickupId, setPickupId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: FeedbackKind; text: string } | null>(null);
+  const [wrongAttempts, setWrongAttempts] = useState(0);
+  const [firstTryCorrect, setFirstTryCorrect] = useState(0);
+  const [firstTryIds, setFirstTryIds] = useState<string[]>([]);
+  const [move, setMove] = useState({ forward: false, back: false, left: false, right: false });
+  const [stepRequest, setStepRequest] = useState<{ direction: Direction; nonce: number } | null>(null);
+  const [done, setDone] = useState(false);
+  const clue = CLUES.find((item) => item.id === inspectId) ?? null;
 
-  const stepIdx = phase === 'investigate' ? (collected.length ? 1 : 0) : phase === 'classify' ? 2 : 3;
+  useEffect(() => {
+    if (!pickupId) return;
+    const timeout = window.setTimeout(() => setInspectId(pickupId), 720);
+    return () => window.clearTimeout(timeout);
+  }, [pickupId]);
 
   useBuddyTopic(
-    phase === 'investigate'
-      ? {
-          scope: 1,
-          hint: 'สังเกตให้ดี: สิ่งไหน "หยิบจับได้" และสิ่งไหน "มองเห็นได้แค่บนหน้าจอ"?',
-          evidence: ['ดูบรรทัด "สัมผัส" ในหน้าต่าง Inspect ของแต่ละชิ้น', `ตอนนี้เก็บหลักฐานได้ ${collected.length}/8 ชิ้น`],
-          lesson: { text: 'ระบบคอมพิวเตอร์มีทั้งส่วนที่จับต้องได้ และส่วนที่เป็นคำสั่ง/ข้อมูล ลองแยกให้ออกว่าเป็นส่วนไหน' },
-        }
-      : phase === 'classify'
-        ? {
-            scope: 1,
-            hint: 'ถ้าคุณถอดสิ่งนั้นออกจากเครื่องแล้ววางบนโต๊ะได้ มันควรอยู่ฝั่งไหน?',
-            evidence: ['หลักฐานที่เก็บมามีข้อความ "แตะได้" หรือ "แตะไม่ได้" กำกับไว้', 'ระบบปฏิบัติการอัปเดตได้โดยไม่เปลี่ยนชิ้นส่วน — นั่นบอกอะไร?'],
-            lesson: { text: 'Software คือชุดคำสั่ง, Data คือข้อมูล ทั้งสองจับต้องไม่ได้ แต่ต้องอาศัยบางสิ่งที่จับต้องได้ในการทำงาน' },
-          }
-        : {
-            scope: 1,
-            hint: 'ดูกลุ่ม "จับต้องได้" ที่คุณจัดไว้ — ทุกชิ้นมีอะไรเหมือนกัน?',
-            evidence: ['Monitor, Keyboard, Mouse, RAM, SSD อยู่กลุ่มเดียวกันเพราะอะไร?'],
-            lesson: { text: 'คำว่า "กายภาพ (Physical)" หมายถึงมีตัวตน จับต้องได้ มองเห็นได้', hw: ['monitor', 'ram', 'ssd'] },
-          },
-    [phase, collected.length],
+    { scope: 1, hint: 'รับบทช่างซ่อม เดินสำรวจห้องให้ทั่วก่อนสรุปว่าอะไรเป็นอุปกรณ์จริง ลองมองหารูปร่างและขั้วต่อของชิ้นส่วน', evidence: [`เก็บหลักฐานแล้ว ${found.length}/${CLUES.length} ชิ้น`, 'อุปกรณ์จริงจะหยิบจับหรือถอดออกมาเป็นชิ้นส่วนได้ ส่วนโปรแกรมและไฟล์เป็นข้อมูลบนระบบ'], lesson: { text: 'Hardware คือส่วนประกอบทางกายภาพที่จับต้องได้ ส่วนซอฟต์แวร์และข้อมูลต้องอาศัย Hardware ในการทำงาน' } },
+    [found.length],
   );
 
-  const openInspect = (o: LabObject) => {
-    setInspecting(o);
-    setInspected((x) => (x.includes(o.id) ? x : [...x, o.id]));
+  const selected = useMemo(() => CLUES.find((item) => item.id === nearId) ?? null, [nearId]);
+  const step = done ? 2 : found.length === CLUES.length ? 2 : found.length ? 1 : 0;
+
+  const inspect = (id: string) => {
+    if (found.includes(id) || pickupId) return;
+    setPickupId(id);
+    setFeedback(null);
   };
 
-  const collect = (o: LabObject) => {
-    addEvidence({
-      id: `m1-${o.id}`,
-      type: o.physical ? 'hardware' : 'clue',
-      title: `${o.en} (${o.name})`,
-      lines: [`พบที่: ${o.where}`, `สัมผัส: ${o.touch}`],
-      mission: 1,
-      hwId: o.physical ? o.id : undefined,
-    });
-    setCollected((c) => (c.includes(o.id) ? c : [...c, o.id]));
-    setInspecting(null);
-    setFb(null);
-  };
-
-  const toClassify = () => {
-    if (collected.length < OBJECTS.length) {
-      setFb({ kind: 'investigate', text: `ยังมีวัตถุที่ไม่ได้เก็บหลักฐานอีก ${OBJECTS.length - collected.length} ชิ้น ช่างเทคนิคที่ดีต้องตรวจให้ครบก่อนสรุป` });
+  const classify = (physical: boolean) => {
+    if (!clue) return;
+    if (physical !== clue.physical) {
+      setWrongAttempts((n) => n + 1);
+      setFeedback({ kind: 'incorrect', text: clue.physical ? 'นี่เป็นชิ้นส่วนที่มีตัวตนจริงในห้องซ่อม ลองสังเกตตัวอุปกรณ์ ขั้วต่อ และพื้นผิวอีกครั้ง' : 'สิ่งนี้แสดงอยู่บนอุปกรณ์ แต่ตัวโปรแกรม/ข้อมูลเองไม่ได้เป็นชิ้นส่วนที่หยิบออกมาถือได้ ลองทบทวนหลักฐานอีกครั้ง' });
       return;
     }
-    setFb(null);
-    setPhase('classify');
-  };
-
-  const place = (bin: Bin) => {
-    if (!sel) return;
-    setBins((b) => ({ ...b, [sel]: bin }));
-    setWrongIds((w) => w.filter((x) => x !== sel));
-    setSel(null);
-  };
-
-  const check = () => {
-    const wrong = OBJECTS.filter((o) => bins[o.id] !== (o.physical ? 'physical' : 'virtual')).map((o) => o.id);
-    setChecks((c) => c + 1);
-    if (firstCorrect === null) setFirstCorrect(OBJECTS.length - wrong.length);
-    if (wrong.length === 0) {
-      setFb({ kind: 'correct', text: 'แยกได้ถูกต้องทั้งหมด! สังเกตว่ากลุ่มหนึ่งจับต้องได้ อีกกลุ่มเป็นคำสั่งหรือข้อมูล' });
-      addEvidence({ id: 'm1-classify', type: 'category', title: 'Physical vs Non-physical', lines: ['จับต้องได้: Monitor, Keyboard, Mouse, RAM, SSD', 'จับต้องไม่ได้: Browser, File, Operating System'], mission: 1 });
-      setTimeout(() => {
-        setFb(null);
-        setPhase('conclude');
-      }, 1400);
-    } else {
-      setWrongIds(wrong);
-      setFb({ kind: 'incorrect', text: `มี ${wrong.length} ชิ้นที่อยู่ผิดฝั่ง (มีกรอบสีแดง) ลองเปิดหลักฐานดูอีกครั้ง: มันหยิบจับได้จริงไหม?` });
+    const firstTry = !firstTryIds.includes(clue.id);
+    if (firstTry) {
+      setFirstTryIds((ids) => [...ids, clue.id]);
+      setFirstTryCorrect((n) => n + 1);
+    }
+    addEvidence({
+      id: `m1-${clue.id}`,
+      type: clue.physical ? 'hardware' : 'clue',
+      title: `${clue.en} (${clue.name})`,
+      lines: [`พบที่: ${clue.where}`, `หลักฐาน: ${clue.touch}`, `จุดสังเกต: ${clue.observe}`],
+      mission: 1,
+      hwId: clue.physical ? clue.id : undefined,
+    });
+    setFound((items) => [...items, clue.id]);
+    setInspectId(null);
+    setPickupId(null);
+    setFeedback({ kind: 'correct', text: `${clue.name} — ${clue.physical ? 'Hardware จับต้องได้' : 'ซอฟต์แวร์/ข้อมูลจับต้องไม่ได้'} บันทึกลงแฟ้มช่างแล้ว` });
+    if (found.length + 1 === CLUES.length) {
+      addEvidence({ id: 'm1-definition', type: 'case', title: 'สรุปงานช่าง: ความหมายของ Hardware', lines: ['Hardware คือส่วนประกอบทางกายภาพของระบบคอมพิวเตอร์ที่จับต้องได้', 'โปรแกรมและข้อมูลทำงานโดยอาศัย Hardware'], mission: 1 });
+      window.setTimeout(() => { setDone(true); setFeedback(null); }, 900);
     }
   };
 
-  if (phase === 'done') {
-    const acc = clamp((((firstCorrect ?? 0) / OBJECTS.length) * 60) + (q1Tries === 1 ? 20 : 8) + (q2Tries === 1 ? 20 : 8));
-    return (
-      <MissionComplete
-        id={1}
-        score={{ accuracy: acc, investigation: clamp((inspected.length / OBJECTS.length) * 100), reasoning: clamp(100 - (q1Tries - 1) * 25 - (q2Tries - 1) * 25 - (checks - 1) * 10), independence: independence(hints) }}
-        learned={
-          <>
-            <p><b>Hardware</b> คือ <b>ส่วนประกอบทางกายภาพ</b> ของระบบคอมพิวเตอร์ — สิ่งที่จับต้องได้ มองเห็นได้</p>
-            <p className="mt-2">ส่วน Browser, File และ Operating System เป็นซอฟต์แวร์หรือข้อมูล จับต้องไม่ได้ แต่ต้องอาศัย Hardware ในการทำงาน</p>
-          </>
-        }
-      />
-    );
+  const setDirection = (direction: Direction, pressed: boolean) => setMove((current) => current[direction] === pressed ? current : { ...current, [direction]: pressed });
+  const directionButton = (direction: Direction, label: string, Icon: typeof ArrowUp) => (
+    <button key={direction} type="button" aria-label={label} onPointerDown={(event: ReactPointerEvent<HTMLButtonElement>) => { event.currentTarget.setPointerCapture(event.pointerId); setStepRequest({ direction, nonce: Date.now() + Math.random() }); setDirection(direction, true); }} onPointerUp={() => setDirection(direction, false)} onPointerCancel={() => setDirection(direction, false)} onLostPointerCapture={() => setDirection(direction, false)} className="grid h-12 w-12 touch-none select-none place-items-center rounded-xl border border-white/15 bg-slate-950/90 text-white shadow-lg transition active:scale-95 active:bg-cyan-700 focus-visible:outline-2 focus-visible:outline-cyan-300" title={`${label} (แตะเพื่อก้าวหนึ่งครั้ง, กดค้างเพื่อเดิน)`}><Icon className="h-5 w-5" aria-hidden="true" /></button>
+  );
+
+  if (done) {
+    const accuracy = clamp((firstTryCorrect / CLUES.length) * 100);
+    return <MissionComplete id={1} score={{ accuracy, investigation: 100, reasoning: clamp(100 - wrongAttempts * 12), independence: independence(hints) }} learned={<><p><b>Hardware</b> คือส่วนประกอบทางกายภาพของคอมพิวเตอร์ เช่น จอภาพ แป้นพิมพ์ เมาส์ RAM และ SSD</p><p className="mt-2">เว็บเบราว์เซอร์ ระบบปฏิบัติการ และไฟล์รายงานเป็นซอฟต์แวร์หรือข้อมูล จับต้องไม่ได้ แต่ต้องอาศัย Hardware เพื่อทำงาน</p></>} meta={{ found: CLUES.length, wrongAttempts }} />;
   }
 
   return (
-    <MissionFrame
-      id={1}
-      steps={STEPS}
-      step={stepIdx}
-      brief={
-        phase === 'investigate' ? (
-          <>ห้อง <b>Computer Lab 204</b> ถูกแจ้งว่า "มีของหายและของเกิน" 🕵️ สำรวจทุกสิ่งในห้อง กด <b>Inspect</b> แล้ว <b>Collect Evidence</b> ให้ครบทั้ง 8 ชิ้น</>
-        ) : phase === 'classify' ? (
-          <>เอาหลักฐานมาแยกเป็น 2 กลุ่ม: แตะหลักฐาน 1 ชิ้น แล้วแตะกล่องปลายทาง</>
-        ) : (
-          <>หลักฐานพร้อมแล้ว ถึงเวลาสรุปคดี!</>
-        )
-      }
-    >
-      {phase === 'investigate' && (
-        <>
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-indigo-100 via-sky-50 to-white p-4 ring-1 ring-indigo-100 sm:p-6">
-            <div className="mb-3 flex items-center justify-between text-xs font-bold text-indigo-700">
-              <span>📍 COMPUTER LAB 204</span>
-              <span className="tabular-nums">Evidence {collected.length}/8</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {OBJECTS.map((o, i) => {
-                const got = collected.includes(o.id);
-                const seen = inspected.includes(o.id);
-                return (
-                  <motion.button
-                    key={o.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    whileHover={{ y: -4 }}
-                    onClick={() => openInspect(o)}
-                    className={cx('relative flex flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-md ring-2 transition', got ? 'ring-emerald-300' : 'ring-transparent hover:ring-indigo-300')}
-                  >
-                    <span className={cx('grid h-14 w-14 place-items-center rounded-2xl', got ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600')}>
-                      <Ico name={o.icon} className="h-7 w-7" />
-                    </span>
-                    <span className="text-sm font-bold text-slate-800">{seen ? o.en : 'วัตถุ ???'}</span>
-                    <span className={cx('rounded-full px-2 py-0.5 text-[11px] font-bold', got ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500')}>
-                      {got ? '✓ เก็บแล้ว' : seen ? 'ตรวจแล้ว' : <><Search className="inline h-3 w-3" aria-hidden="true" /> Inspect</>}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="mt-4 space-y-3">
-            {fb && <Feedback kind={fb.kind}>{fb.text}</Feedback>}
-            <div className="flex justify-end">
-              <Btn onClick={toClassify}>
-                วิเคราะห์หลักฐาน <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Btn>
-            </div>
-          </div>
-          <Modal open={!!inspecting} onClose={() => setInspecting(null)} title={inspecting ? `Inspect: ${inspecting.en}` : ''}>
-            {inspecting && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-slate-100">
-                  <span className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-50 text-indigo-600"><Ico name={inspecting.icon} className="h-8 w-8" /></span>
-                  <div>
-                    <p className="font-display text-lg font-bold">{inspecting.name}</p>
-                    <p className="text-sm text-slate-500">{inspecting.en}</p>
-                  </div>
-                </div>
-                <dl className="space-y-2 text-sm">
-                  <Row k="📍 พบที่" v={inspecting.where} />
-                  <Row k="✋ สัมผัส" v={inspecting.touch} />
-                  <Row k="👁 สังเกต" v={inspecting.observe} />
-                </dl>
-                <Btn className="w-full" onClick={() => collect(inspecting)} disabled={collected.includes(inspecting.id)}>
-                  <PackageCheck className="h-5 w-5" aria-hidden="true" /> {collected.includes(inspecting.id) ? 'เก็บหลักฐานแล้ว' : 'Collect Evidence'}
-                </Btn>
-              </div>
-            )}
-          </Modal>
-        </>
-      )}
-
-      {phase === 'classify' && (
-        <div className="space-y-4">
-          <Card>
-            <p className="mb-3 text-sm font-semibold text-slate-600">หลักฐานที่ยังไม่ได้จัด ({OBJECTS.filter((o) => !bins[o.id]).length})</p>
-            <div className="flex min-h-12 flex-wrap gap-2">
-              {OBJECTS.filter((o) => !bins[o.id]).map((o) => (
-                <Chip key={o.id} o={o} selected={sel === o.id} onClick={() => setSel(sel === o.id ? null : o.id)} />
-              ))}
-              {OBJECTS.every((o) => bins[o.id]) && <span className="text-sm text-slate-400">จัดครบแล้ว — กดตรวจสอบได้เลย</span>}
-            </div>
-          </Card>
-          <div className="grid gap-4 md:grid-cols-2">
-            {(['physical', 'virtual'] as Bin[]).map((b) => (
-              <button
-                key={b}
-                onClick={() => place(b)}
-                disabled={!sel}
-                className={cx(
-                  'min-h-44 rounded-3xl border-2 border-dashed p-4 text-left transition',
-                  b === 'physical' ? 'border-emerald-300 bg-emerald-50/60' : 'border-violet-300 bg-violet-50/60',
-                  sel && 'ring-4 ring-indigo-200 hover:scale-[1.01]',
-                )}
-              >
-                <p className={cx('flex items-center gap-2 font-display text-lg font-bold', b === 'physical' ? 'text-emerald-800' : 'text-violet-800')}>
-                  {b === 'physical' ? <Hand className="h-5 w-5" aria-hidden="true" /> : <Cloud className="h-5 w-5" aria-hidden="true" />}
-                  {b === 'physical' ? 'จับต้องได้ · Physical' : 'จับต้องไม่ได้ · Non-physical'}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {OBJECTS.filter((o) => bins[o.id] === b).map((o) => (
-                    <Chip
-                      key={o.id}
-                      o={o}
-                      wrong={wrongIds.includes(o.id)}
-                      selected={sel === o.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSel(sel === o.id ? null : o.id);
-                      }}
-                    />
-                  ))}
-                </div>
-              </button>
-            ))}
-          </div>
-          {fb && <Feedback kind={fb.kind}>{fb.text}</Feedback>}
-          <div className="flex justify-end">
-            <Btn onClick={check} disabled={!OBJECTS.every((o) => bins[o.id])}>ตรวจสอบการจัดกลุ่ม</Btn>
+    <MissionFrame id={1} steps={STEPS} step={step} brief={<>มีอะไหล่และข้อมูลปะปนกันใน <b>เวิร์กช็อปซ่อมคอม</b> เดินสำรวจให้ครบ {CLUES.length} จุด ตรวจสิ่งที่พบ แล้วจัดเข้ากล่องอะไหล่หรือแฟ้มซอฟต์แวร์ให้ถูกต้อง</>}>
+      <div className="mb-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <Card className="flex min-h-16 items-center gap-3 !p-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-cyan-100 text-cyan-800"><PackageCheck className="h-6 w-6" aria-hidden="true" /></div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-bold text-slate-900">ใบงานซ่อม · ระบุของในเวิร์กช็อป</p><p className="text-xs text-slate-500">ตรวจให้ครบ แล้วบอกว่าเป็นชิ้นส่วนจริงหรือเป็นโปรแกรม/ข้อมูล</p></div>
+          <span className="whitespace-nowrap rounded-xl bg-slate-900 px-3 py-2 text-sm font-black tabular-nums text-white">{found.length}/{CLUES.length}</span>
+        </Card>
+        <div className="flex flex-wrap justify-center gap-2 rounded-2xl bg-slate-900 p-2 sm:justify-end" aria-label="ปุ่มควบคุมการเดิน">
+          <div className="grid grid-cols-3 grid-rows-2 gap-1.5"><span />{directionButton('forward', 'เดินไปข้างหน้า', ArrowUp)}<span />{directionButton('left', 'เดินไปทางซ้าย', ArrowLeft)}{directionButton('back', 'เดินถอยหลัง', ArrowDown)}{directionButton('right', 'เดินไปทางขวา', ArrowRight)}</div>
+        </div>
+      </div>
+      <div className={cx('grid gap-3', clue && 'sm:grid-cols-[minmax(0,1fr)_360px]')}>
+      <div className="relative min-w-0">
+        <Suspense fallback={<div className={cx('grid place-items-center rounded-[1.75rem] bg-slate-950 text-sm font-semibold text-cyan-100', clue ? 'h-[36svh] min-h-[220px] sm:h-[min(52vh,560px)] sm:min-h-[340px] lg:h-[min(64vh,680px)] lg:min-h-[440px]' : 'h-[min(58svh,620px)] min-h-[320px] sm:h-[min(66vh,720px)] sm:min-h-[460px] lg:min-h-[520px]')}>กำลังเตรียมเวิร์กช็อป 3D…</div>}>
+          <Mission1Workshop3D clues={CLUES} collected={found} onNear={setNearId} onInspect={inspect} move={move} stepRequest={stepRequest} controlsEnabled={!clue && !pickupId} pickupId={pickupId} compact={!!clue} />
+        </Suspense>
+        <div className="pointer-events-none absolute right-3 top-16 flex max-w-[47%] flex-wrap justify-end gap-1.5 sm:right-4 sm:top-4 sm:max-w-[55%]" aria-label={`เก็บหลักฐาน ${found.length} จาก ${CLUES.length} ชิ้น`}>
+          {CLUES.map((item, index) => <span key={item.id} title={found.includes(item.id) ? item.en : `ยังไม่พบหลักฐาน ${index + 1}`} className={cx('grid h-7 min-w-7 place-items-center rounded-lg border px-1.5 text-[10px] font-black shadow-md backdrop-blur sm:h-8 sm:min-w-8 sm:text-xs', found.includes(item.id) ? 'border-emerald-300/70 bg-emerald-400/90 text-emerald-950' : 'border-white/20 bg-slate-950/70 text-white/75')}>{found.includes(item.id) ? <Check className="h-3.5 w-3.5" aria-label={`${item.en} เก็บแล้ว`} /> : String(index + 1).padStart(2, '0')}</span>)}
+        </div>
+        {selected && !clue && <div className="relative z-10 mx-auto mt-3 w-full max-w-[640px] rounded-2xl border border-cyan-200/25 bg-slate-950/95 p-3 text-white shadow-lg sm:p-4">
+          <div className="flex items-center gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-500/15 text-cyan-200"><Search className="h-5 w-5" aria-hidden="true" /></div><div className="min-w-0 flex-1"><p className="text-xs font-bold uppercase tracking-wider text-cyan-200">พบเบาะแส · {selected.en}</p><p className="truncate text-sm text-slate-200">เข้าใกล้แล้ว กดตรวจดูเพื่อบันทึกหลักฐาน</p></div><Btn onClick={() => inspect(selected.id)} className="min-h-11 shrink-0 bg-cyan-500 px-4 text-sm text-slate-950 hover:bg-cyan-300"><Hand className="h-4 w-4" aria-hidden="true" /><span className="hidden sm:inline">ตรวจดู</span><kbd className="hidden rounded bg-slate-950/15 px-1.5 py-0.5 text-[10px] sm:inline">E</kbd></Btn></div>
+        </div>}
+        {!selected && found.length < CLUES.length && <div className="absolute bottom-16 left-1/2 z-10 -translate-x-1/2 rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2 text-center text-xs font-semibold text-slate-100 shadow-lg backdrop-blur">สำรวจรอบห้องเพื่อหาเบาะแสที่ยังไม่พบ</div>}
+      </div>
+      <AnimatePresence>
+      {clue && <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: 0.24, ease: 'easeOut' }} className="relative z-10 mx-auto flex h-[min(38vh,340px)] min-h-[270px] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl border border-cyan-100/20 bg-slate-950 p-3 shadow-xl sm:mx-0 sm:h-[min(68vh,720px)] sm:min-h-[570px] sm:max-w-none sm:p-4" aria-label={`ตรวจหลักฐาน ${clue.en}`}>
+        <div className="mb-3 flex shrink-0 items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-widest text-cyan-300">FIELD SCAN</p><h2 className="font-display text-lg font-bold text-white">ตรวจหลักฐาน · {clue.en}</h2></div><button type="button" onClick={() => { setInspectId(null); setPickupId(null); setFeedback(null); }} className="min-h-10 shrink-0 rounded-xl bg-white/10 px-3 text-sm font-bold text-white ring-1 ring-white/15 hover:bg-white/15">ปิด</button></div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          <div className="rounded-xl bg-gradient-to-br from-slate-800 to-indigo-950 p-3 text-white ring-1 ring-cyan-200/15">
+            <p className="text-[10px] font-bold tracking-[.16em] text-cyan-300">จุดสังเกต {CLUES.findIndex((item) => item.id === clue.id) + 1}</p>
+            <h3 className="mt-0.5 text-xl font-bold">{clue.name}</h3><p className="text-xs text-slate-300">{clue.en}</p>
+            <dl className="mt-2 space-y-1.5 text-xs"><div className="rounded-lg bg-white/10 p-2"><dt className="font-bold text-cyan-200">พบที่</dt><dd className="mt-0.5 text-slate-100">{clue.where}</dd></div><div className="rounded-lg bg-white/10 p-2"><dt className="font-bold text-cyan-200">จุดสังเกต</dt><dd className="mt-0.5 text-slate-100">{clue.observe}</dd></div><div className="rounded-lg bg-white/10 p-2"><dt className="font-bold text-cyan-200">หลักฐานสัมผัส</dt><dd className="mt-0.5 text-slate-100">{clue.touch}</dd></div></dl>
           </div>
         </div>
-      )}
-
-      {phase === 'conclude' && (
-        <div className="mx-auto max-w-2xl space-y-4">
-          <Quiz
-            title="สรุปคดี #1: จากหลักฐาน Hardware คืออะไร?"
-            choices={['โปรแกรมที่ติดตั้งในเครื่อง', 'ส่วนประกอบทางกายภาพของระบบคอมพิวเตอร์ ที่จับต้องได้', 'ข้อมูลที่เก็บไว้ในไฟล์', 'ทุกอย่างที่แสดงบนหน้าจอ']}
-            answer={1}
-            value={q1}
-            onPick={(i) => { setQ1(i); setQ1Tries((t) => t + 1); }}
-            wrongFb={['โปรแกรมเป็นสิ่งที่จับต้องไม่ได้ ลองดูกลุ่ม Physical อีกครั้ง', '', 'ไฟล์อยู่ในกลุ่ม Non-physical ใช่ไหม?', 'Browser ก็แสดงบนจอ แต่แตะไม่ได้ ลองคิดใหม่']}
-            rightFb="ใช่! Hardware = ส่วนประกอบทางกายภาพ (Physical Components)"
-          />
-          {q1 === 1 && (
-            <Quiz
-              title="ทดสอบข้อสรุป: ถ้าพบสิ่งเหล่านี้ในห้องอื่น ข้อใดเป็น Hardware?"
-              choices={['โปรแกรมป้องกันไวรัส', 'รูปภาพ .jpg', 'Router ที่ติดผนัง', 'บัญชีผู้ใช้ Windows']}
-              answer={2}
-              value={q2}
-              onPick={(i) => { setQ2(i); setQ2Tries((t) => t + 1); }}
-              wrongFb={['โปรแกรม = ซอฟต์แวร์ จับต้องไม่ได้', 'รูปภาพเป็นข้อมูล (Data)', '', 'บัญชีผู้ใช้เป็นข้อมูลในระบบ']}
-              rightFb="ถูกต้อง Router จับต้องได้ เป็นส่วนประกอบทางกายภาพ"
-            />
-          )}
-          {q2 === 2 && (
-            <div className="flex justify-end">
-              <Btn variant="success" onClick={() => {
-                addEvidence({ id: 'm1-definition', type: 'case', title: 'นิยาม Hardware', lines: ['Hardware = ส่วนประกอบทางกายภาพของระบบคอมพิวเตอร์', 'จับต้องได้ มองเห็นได้'], mission: 1 });
-                setPhase('done');
-              }}>
-                ปิดแฟ้มคดี <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Btn>
-            </div>
-          )}
+        <div className="mt-2 shrink-0 border-t border-white/10 pt-2"><p className="mb-2 text-xs font-bold text-white">จัดหลักฐานเข้ากลุ่ม</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Btn variant="secondary" onClick={() => classify(true)} className="min-h-14 justify-start rounded-xl !px-2 text-left !text-xs"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-800"><Hand className="h-4 w-4" aria-hidden="true" /></span><span><b className="block">กล่องอะไหล่</b><span className="text-[10px] font-medium text-slate-500">Hardware</span></span></Btn>
+            <Btn variant="secondary" onClick={() => classify(false)} className="min-h-14 justify-start rounded-xl !px-2 text-left !text-xs"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-violet-100 text-violet-800"><Search className="h-4 w-4" aria-hidden="true" /></span><span><b className="block">แฟ้มข้อมูล</b><span className="text-[10px] font-medium text-slate-500">Software / Data</span></span></Btn>
+          </div>
+          {feedback && <div className="mt-2"><Feedback kind={feedback.kind}>{feedback.text}</Feedback></div>}
         </div>
-      )}
+      </motion.section>}
+      </AnimatePresence>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500"><p className="flex items-center gap-1.5"><Keyboard className="h-4 w-4" aria-hidden="true" /> WASD / ลูกศรเพื่อเดิน · E เพื่อตรวจ · ใช้ปุ่มลูกศรบนจอได้</p><p className="flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-amber-500" aria-hidden="true" /> ฮาร์ดแวร์จริงมีวงแหวนฟ้า · โปรแกรม/ข้อมูลมีวงแหวนม่วง</p></div>
+      {feedback && !clue && <div className="mt-3"><Feedback kind={feedback.kind}>{feedback.text}</Feedback></div>}
     </MissionFrame>
-  );
-}
-
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-100">
-      <dt className="w-20 shrink-0 font-semibold text-slate-500">{k}</dt>
-      <dd className="text-slate-800">{v}</dd>
-    </div>
-  );
-}
-
-function Chip({ o, selected, wrong, onClick }: { o: LabObject; selected: boolean; wrong?: boolean; onClick: (e: React.MouseEvent) => void }) {
-  return (
-    <motion.span
-      layout
-      role="button"
-      tabIndex={0}
-      aria-pressed={selected}
-      onClick={onClick}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onClick(e as unknown as React.MouseEvent)}
-      className={cx(
-        'inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold shadow-sm ring-2',
-        selected ? 'ring-indigo-500' : wrong ? 'ring-rose-400' : 'ring-slate-200',
-      )}
-    >
-      <Ico name={o.icon} className="h-4 w-4 text-slate-500" />
-      {o.en}
-      {wrong && <span className="text-rose-500" aria-label="อยู่ผิดกลุ่ม">✕</span>}
-    </motion.span>
   );
 }

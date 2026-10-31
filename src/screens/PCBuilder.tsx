@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Shell } from '../components/Shell';
 import { cx } from '../components/ui';
+import { useStore } from '../store';
 import {
   buildPower, buildPrice, CATEGORY_LABELS, CATEGORY_ORDER,
   checkBuild, PARTS, SCENARIOS, scoreBuild,
@@ -59,16 +60,26 @@ function fromIds(ids: string[]): Build {
 }
 
 export function PCBuilder() {
-  const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
-  const [category, setCategory] = useState<PartCategory>('case');
-  const [selectedId, setSelectedId] = useState<string | null>('case-pulse');
-  const [build, setBuild] = useState<Build>({});
+  const { markBuilderComplete, state, go } = useStore();
+  const assemblyOrder = state.assemblyOrder;
+  const [scenarioId, setScenarioId] = useState(assemblyOrder?.scenarioId ?? SCENARIOS[0].id);
+  const [category, setCategory] = useState<PartCategory>(assemblyOrder ? 'motherboard' : 'case');
+  const [selectedId, setSelectedId] = useState<string | null>(assemblyOrder?.partIds.motherboard ?? 'case-pulse');
+  const [build, setBuild] = useState<Build>(() => {
+    const orderedCase = assemblyOrder?.partIds.case;
+    const casePart = orderedCase ? PARTS.find((part) => part.id === orderedCase) : undefined;
+    return casePart ? { case: casePart } : {};
+  });
   const [boot, setBoot] = useState<BootState>('idle');
   const [bootStep, setBootStep] = useState(0);
   const [sceneBusy, setSceneBusy] = useState(false);
   const [draggedPartId, setDraggedPartId] = useState<string | null>(null);
   const [dropReady, setDropReady] = useState(false);
   const [installRequest, setInstallRequest] = useState<{ partId: string; nonce: number } | null>(null);
+  const [removedScrews, setRemovedScrews] = useState<number[]>([]);
+  const [securedCategories, setSecuredCategories] = useState<PartCategory[]>([]);
+  const [pendingFastener, setPendingFastener] = useState<{ category: PartCategory; part: PcPart } | null>(null);
+  const [connectedCables, setConnectedCables] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'3d' | '2d'>(() => {
     try { return localStorage.getItem('hardware-quest.builder.view') === '2d' ? '2d' : '3d'; } catch { return '3d'; }
   });
@@ -79,6 +90,20 @@ export function PCBuilder() {
     } catch { return {}; }
   });
   const scenario = SCENARIOS.find((item) => item.id === scenarioId)!;
+  const caseOpen = !assemblyOrder || removedScrews.length === 4;
+  const availableCategories = assemblyOrder ? CATEGORY_ORDER.filter((item) => item !== 'case') : CATEGORY_ORDER;
+  const categoryParts = useMemo(() => assemblyOrder
+    ? PARTS.filter((part) => part.id === assemblyOrder.partIds[category])
+    : PARTS.filter((part) => part.category === category), [assemblyOrder, category]);
+  const requiredCables = useMemo(() => [
+    { id: 'atx-24', label: 'สายเมนบอร์ด ATX 24-pin', port: 'ช่องจ่ายไฟหลักของเมนบอร์ด' },
+    { id: 'cpu-eps', label: 'สาย CPU EPS 8-pin', port: 'ช่องไฟเลี้ยง CPU ด้านบนบอร์ด' },
+    ...(build.gpu ? [{ id: 'gpu-pcie', label: 'สาย PCIe การ์ดจอ', port: 'ช่องไฟของการ์ดจอ' }] : []),
+    ...(build.cooler ? [{ id: 'cpu-fan', label: build.cooler.id === 'cool-liquid' ? 'สายปั๊มน้ำ + CPU_FAN' : 'สายพัดลม CPU_FAN', port: 'หัวต่อระบายความร้อนบนเมนบอร์ด' }] : []),
+    { id: 'front-panel', label: 'สายปุ่ม Power หน้าเคส', port: 'Front Panel Header' },
+    { id: 'psu-ac', label: 'สายไฟเข้า PSU', port: 'ช่อง AC หลังพาวเวอร์ซัพพลาย' },
+  ], [build.gpu, build.cooler]);
+  const allCablesConnected = requiredCables.every((cable) => connectedCables.includes(cable.id));
   const selected = PARTS.find((item) => item.id === selectedId) ?? null;
   const issues = useMemo(() => checkBuild(build, scenario), [build, scenario]);
   const price = buildPrice(build);
@@ -87,7 +112,13 @@ export function PCBuilder() {
   const warnings = issues.filter((issue) => issue.severity === 'warn');
   const headlineIssue = blocks[0] ?? warnings[0] ?? issues.find((issue) => issue.severity === 'good');
   const installed = CATEGORY_ORDER.filter((item) => build[item]).length;
+  const missingSecuredCategory = (['storage', 'gpu', 'cooler'] as PartCategory[]).find((item) => build[item] && !securedCategories.includes(item));
+  const guidedReady = !assemblyOrder || (caseOpen && installed === CATEGORY_ORDER.length && !missingSecuredCategory && allCablesConnected);
   const result = boot === 'success' ? scoreBuild(build, scenario) : null;
+
+  useEffect(() => {
+    if (result) markBuilderComplete();
+  }, [result, markBuilderComplete]);
 
   useEffect(() => {
     if (boot !== 'checking') return;
@@ -106,23 +137,44 @@ export function PCBuilder() {
   }, [result, scenario.id, bestScores]);
 
   function resetBuild(nextScenarioId = scenarioId) {
-    setScenarioId(nextScenarioId);
-    setBuild({});
-    setSelectedId('case-pulse');
-    setCategory('case');
+    const nextScenario = assemblyOrder?.scenarioId ?? nextScenarioId;
+    const orderedCase = assemblyOrder?.partIds.case;
+    const casePart = orderedCase ? PARTS.find((part) => part.id === orderedCase) : undefined;
+    setScenarioId(nextScenario);
+    setBuild(casePart ? { case: casePart } : {});
+    setSelectedId(assemblyOrder?.partIds.motherboard ?? 'case-pulse');
+    setCategory(assemblyOrder ? 'motherboard' : 'case');
     setBoot('idle');
     setBootStep(0);
+    setRemovedScrews([]);
+    setSecuredCategories([]);
+    setPendingFastener(null);
+    setConnectedCables([]);
   }
 
   function install(categoryToFill: PartCategory, partId = selected?.id) {
     const part = PARTS.find((item) => item.id === partId);
     if (!part || part.category !== categoryToFill || boot === 'checking') return;
+    if (assemblyOrder && (categoryToFill === 'case' || assemblyOrder.partIds[categoryToFill] !== part.id)) return;
+    if (assemblyOrder && ['storage', 'gpu', 'cooler'].includes(categoryToFill)) {
+      setPendingFastener({ category: categoryToFill, part });
+      setBoot('idle');
+      return;
+    }
+    commitInstall(categoryToFill, part);
+  }
+
+  function commitInstall(categoryToFill: PartCategory, part: PcPart) {
     setBuild((current) => ({ ...current, [categoryToFill]: part }));
     setSelectedId(null);
     setBoot('idle');
-    const index = CATEGORY_ORDER.indexOf(categoryToFill);
-    const nextEmpty = CATEGORY_ORDER.slice(index + 1).find((item) => !build[item]);
-    if (nextEmpty) setCategory(nextEmpty);
+  }
+
+  function finishFastener() {
+    if (!pendingFastener) return;
+    setSecuredCategories((current) => current.includes(pendingFastener.category) ? current : [...current, pendingFastener.category]);
+    commitInstall(pendingFastener.category, pendingFastener.part);
+    setPendingFastener(null);
   }
 
   function startPartDrag(event: DragEvent<HTMLElement>, partId: string) {
@@ -138,7 +190,7 @@ export function PCBuilder() {
     const part = PARTS.find((item) => item.id === partId);
     setDropReady(false);
     setDraggedPartId(null);
-    if (!part || sceneBusy || boot === 'checking') return;
+    if (!part || sceneBusy || boot === 'checking' || (assemblyOrder && assemblyOrder.partIds[part.category] !== part.id)) return;
     setCategory(part.category);
     setSelectedId(part.id);
     if (viewMode === '3d') setInstallRequest({ partId: part.id, nonce: Date.now() });
@@ -151,6 +203,7 @@ export function PCBuilder() {
   }
 
   function tryBoot() {
+    if (!guidedReady) return;
     if (blocks.length) {
       setBoot('failed');
       return;
@@ -167,13 +220,19 @@ export function PCBuilder() {
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-400 text-slate-950"><Wrench className="h-5 w-5" /></span>
             <div className="min-w-0"><b className="block truncate font-display">โต๊ะประกอบคอม</b><span className="block truncate text-xs text-slate-400">{scenario.role} · งบ {scenario.budget.toLocaleString('th-TH')} ฿</span></div>
           </div>
-          <label className="sr-only" htmlFor="scenario-select">เลือกโจทย์</label>
-          <select id="scenario-select" value={scenario.id} disabled={boot === 'checking' || sceneBusy} onChange={(event) => resetBuild(event.target.value)} className="min-h-11 w-full min-w-0 cursor-pointer rounded-xl border border-white/15 bg-slate-900 px-3 text-sm font-bold text-white outline-none focus:border-cyan-300 disabled:opacity-40 sm:w-auto">
-            {SCENARIOS.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.difficulty}</option>)}
-          </select>
-          <button disabled={boot === 'checking' || sceneBusy} onClick={() => setBuild(fromIds(RECOMMENDED[scenario.id] ?? []))} className="builder-button border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-4 w-4" /> สเปกตัวอย่าง</button>
+          {assemblyOrder ? <div className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 text-sm font-bold text-cyan-100 sm:w-auto"><Sparkles className="h-4 w-4 shrink-0" /> รายการจากลูกค้า · สุ่มงาน</div> : <>
+            <label className="sr-only" htmlFor="scenario-select">เลือกโจทย์</label>
+            <select id="scenario-select" value={scenario.id} disabled={boot === 'checking' || sceneBusy} onChange={(event) => resetBuild(event.target.value)} className="min-h-11 w-full min-w-0 cursor-pointer rounded-xl border border-white/15 bg-slate-900 px-3 text-sm font-bold text-white outline-none focus:border-cyan-300 disabled:opacity-40 sm:w-auto">
+              {SCENARIOS.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.difficulty}</option>)}
+            </select>
+            <button disabled={boot === 'checking' || sceneBusy} onClick={() => setBuild(fromIds(RECOMMENDED[scenario.id] ?? []))} className="builder-button border-cyan-400/30 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40"><Sparkles className="h-4 w-4" /> สเปกตัวอย่าง</button>
+          </>}
           <button disabled={boot === 'checking' || sceneBusy} onClick={() => resetBuild()} className="builder-button border-white/15 bg-white/5 text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" aria-label="ล้างโต๊ะ"><RotateCcw className="h-4 w-4" /></button>
         </div>
+
+        {assemblyOrder && <section className="border-b border-cyan-300/15 bg-cyan-950/35 px-4 py-3 sm:px-6" aria-label="ใบสั่งประกอบคอมจากลูกค้า">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-black tracking-[.18em] text-cyan-300">CUSTOMER BUILD ORDER · {assemblyOrder.customerName}</p><p className="text-xs text-slate-300">{assemblyOrder.role} · สุ่มจากรายการที่จัดสเปกผ่านในด่านรับงาน</p></div><div className="flex flex-wrap gap-1.5">{CATEGORY_ORDER.map((item) => <span key={item} className="rounded-lg border border-white/10 bg-white/[.05] px-2 py-1 text-[10px] font-semibold text-slate-200">{CATEGORY_LABELS[item].th}: {PARTS.find((part) => part.id === assemblyOrder.partIds[item])?.name ?? '—'}</span>)}</div></div>
+        </section>}
 
         <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[250px_minmax(0,1fr)]">
           <aside className="order-2 rounded-3xl border border-white/10 bg-[#0d1424] p-3 lg:order-1">
@@ -182,13 +241,13 @@ export function PCBuilder() {
                 <p className="text-xs font-bold tracking-[.16em] text-cyan-300">PARTS DEPOT</p>
                 <h3 className="font-display text-lg font-bold">คลังชิ้นส่วน</h3>
               </div>
-              <span className="rounded-xl bg-white/5 px-2 py-1 text-xs text-slate-400">{PARTS.filter((part) => part.category === category).length} รายการ</span>
+              <span className="rounded-xl bg-white/5 px-2 py-1 text-xs text-slate-400">{categoryParts.length} รายการ</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
-              {CATEGORY_ORDER.map((item) => {
+              {availableCategories.map((item) => {
                 const Icon = ICONS[item];
                 return (
-                  <button key={item} disabled={sceneBusy || boot === 'checking'} onClick={() => { setCategory(item); setSelectedId(null); }} aria-label={CATEGORY_LABELS[item].th} aria-pressed={category === item} className={cx('relative grid min-h-12 cursor-pointer place-items-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-40', category === item ? 'bg-cyan-400 text-slate-950' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white')}>
+                  <button key={item} disabled={!caseOpen || sceneBusy || boot === 'checking'} onClick={() => { setCategory(item); setSelectedId(assemblyOrder ? assemblyOrder.partIds[item] ?? null : null); }} aria-label={CATEGORY_LABELS[item].th} aria-pressed={category === item} className={cx('relative grid min-h-12 cursor-pointer place-items-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-40', category === item ? 'bg-cyan-400 text-slate-950' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white')}>
                     <Icon className="h-5 w-5" />
                     {build[item] && <Check className="absolute right-1 top-1 h-3 w-3 rounded-full bg-emerald-400 p-0.5 text-emerald-950" />}
                   </button>
@@ -197,8 +256,8 @@ export function PCBuilder() {
             </div>
             <p className="mb-2 mt-4 px-1 text-xs font-semibold text-slate-400">{CATEGORY_LABELS[category].th} · {CATEGORY_LABELS[category].en}</p>
             <div className="space-y-2 lg:max-h-[680px] lg:overflow-y-auto lg:pr-1">
-              {PARTS.filter((part) => part.category === category).map((part, index) => (
-                <PartCard key={part.id} part={part} selected={part.id === selectedId} installed={build[category]?.id === part.id} disabled={sceneBusy || boot === 'checking'} index={index} onSelect={() => setSelectedId(part.id)} onDragStart={(event) => startPartDrag(event, part.id)} onDragEnd={() => { setDraggedPartId(null); setDropReady(false); }} />
+              {categoryParts.map((part, index) => (
+                <PartCard key={part.id} part={part} selected={part.id === selectedId} installed={build[category]?.id === part.id} disabled={!caseOpen || sceneBusy || boot === 'checking'} index={index} onSelect={() => setSelectedId(part.id)} onDragStart={(event) => startPartDrag(event, part.id)} onDragEnd={() => { setDraggedPartId(null); setDropReady(false); }} />
               ))}
             </div>
           </aside>
@@ -247,7 +306,8 @@ export function PCBuilder() {
                       build={build}
                       selectedId={selectedId}
                       issues={issues}
-                      disabled={boot === 'checking' || sceneBusy}
+                      disabled={!caseOpen || boot === 'checking' || sceneBusy}
+                      caseOpen={caseOpen}
                       onInstall={(item, partId) => install(item, partId)}
                       onBusyChange={setSceneBusy}
                       installRequest={installRequest}
@@ -256,8 +316,11 @@ export function PCBuilder() {
                   </Suspense>
                 </SceneErrorBoundary>
               ) : (
-                <BuildGrid build={build} selected={selected} issues={issues} onInstall={install} onRemove={(item) => { setBuild((current) => ({ ...current, [item]: undefined })); setBoot('idle'); }} />
+                <BuildGrid build={build} selected={selected} issues={issues} fixedCategories={assemblyOrder ? ['case'] : []} onInstall={install} onRemove={(item) => { setBuild((current) => ({ ...current, [item]: undefined })); setSecuredCategories((current) => current.filter((categoryToKeep) => categoryToKeep !== item)); setConnectedCables([]); setBoot('idle'); }} />
               )}
+
+              {assemblyOrder && !caseOpen && <div className="absolute inset-3 z-30 grid place-items-center rounded-[1.5rem] border border-cyan-300/25 bg-[#06101f]/95 p-4 backdrop-blur-md"><CaseScrewPanel removed={removedScrews} onRemove={(screw) => setRemovedScrews((current) => current.includes(screw) ? current : [...current, screw])} /></div>}
+              <AnimatePresence>{pendingFastener && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-3 z-30 grid place-items-center rounded-[1.5rem] bg-[#030712]/90 p-4 backdrop-blur-md"><div className="w-full max-w-md rounded-2xl border border-amber-300/25 bg-[#0b1423] p-5 text-center shadow-2xl"><Wrench className="mx-auto h-9 w-9 text-amber-300" /><p className="mt-3 text-xs font-black tracking-[.18em] text-amber-200">SECURE COMPONENT</p><h3 className="mt-1 font-display text-xl font-bold text-white">{pendingFastener.category === 'storage' ? 'ขันน็อตยึด SSD เข้ากับสล็อต M.2' : pendingFastener.category === 'gpu' ? 'ขันสกรูยึดการ์ดจอกับเคส' : 'ล็อกชุดระบายความร้อนและยึดฐานกับ CPU'}</h3><p className="mt-2 text-sm text-slate-400">จัดแนวอุปกรณ์ให้ตรงตำแหน่ง แล้วใช้ไขควงยึดให้แน่นก่อนต่อสาย</p><button onClick={finishFastener} className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-300 to-orange-300 px-5 font-black text-slate-950 transition hover:brightness-110"><Wrench className="h-4 w-4" /> หมุนไขควง · ยึดให้แน่น</button></div></motion.div>}</AnimatePresence>
 
               {selected && boot !== 'checking' && (
                 <button
@@ -268,6 +331,15 @@ export function PCBuilder() {
                   <Wrench className="h-5 w-5" /> ติดตั้ง {selected.name} อัตโนมัติ
                 </button>
               )}
+
+              {assemblyOrder && caseOpen && <section className="relative mt-4 rounded-2xl border border-cyan-300/20 bg-[#07111e]/90 p-4" aria-label="รายการงานประกอบ">
+                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-black tracking-[.18em] text-cyan-300">ASSEMBLY CHECKLIST</p><h3 className="font-display font-bold text-white">ประกอบได้ตามลำดับที่ถนัด</h3></div><span className="rounded-full bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-300">ติดตั้ง {installed}/{CATEGORY_ORDER.length}</span></div>
+                <p className="mt-1 text-xs text-slate-400">วาง CPU, RAM, GPU, SSD, PSU หรือระบบระบายความร้อนก่อนหลังก็ได้ · SSD, GPU และชุด Cooling ต้องยึดก่อน</p>
+                {installed === CATEGORY_ORDER.length ? <div className="mt-4"><p className="mb-2 text-xs font-bold text-amber-200">เสียบสายให้ครบก่อนเปิดเครื่อง</p><div className="grid gap-2 sm:grid-cols-2">{requiredCables.map((cable) => {
+                  const connected = connectedCables.includes(cable.id);
+                  return <button key={cable.id} type="button" aria-pressed={connected} onClick={() => setConnectedCables((current) => connected ? current.filter((id) => id !== cable.id) : [...current, cable.id])} className={cx('flex min-h-12 items-center gap-2 rounded-xl border p-3 text-left transition', connected ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100' : 'border-white/10 bg-white/[.04] text-slate-200 hover:border-cyan-200/30')}><PlugZap className={cx('h-4 w-4 shrink-0', connected ? 'text-emerald-300' : 'text-cyan-300')} /><span className="min-w-0 flex-1"><b className="block text-xs">{cable.label}</b><span className="block truncate text-[10px] text-slate-400">{cable.port}</span></span><span className="text-[10px] font-black">{connected ? 'เสียบแล้ว' : 'เสียบสาย'}</span></button>;
+                })}</div></div> : <div className="mt-3 flex flex-wrap gap-1.5">{availableCategories.map((item) => <span key={item} className={cx('rounded-lg px-2 py-1 text-[10px] font-bold', build[item] ? 'bg-emerald-300/10 text-emerald-200' : 'bg-white/5 text-slate-400')}>{build[item] ? '✓ ' : '○ '}{CATEGORY_LABELS[item].th}</span>)}</div>}
+              </section>}
 
               <AnimatePresence>
                 {boot !== 'idle' && (
@@ -285,7 +357,7 @@ export function PCBuilder() {
               <div className={cx('rounded-2xl border px-4 py-3', blocks.length ? 'border-rose-400/25 bg-rose-400/10' : warnings.length ? 'border-amber-300/20 bg-amber-300/[.08]' : 'border-emerald-400/20 bg-emerald-400/[.08]')}>
                 <div className="flex items-start gap-2">{blocks.length ? <X className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" /> : warnings.length ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /> : <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />}<div><b className="text-sm">{headlineIssue?.title ?? 'ระบบพร้อม'}</b><p className="text-xs text-slate-400">{headlineIssue?.detail ?? 'ชิ้นส่วนเข้ากันได้ กดเปิดเครื่องเพื่อทดสอบ'}</p></div></div>
               </div>
-              <button onClick={tryBoot} disabled={boot === 'checking' || sceneBusy} className={cx('group flex min-h-14 min-w-52 cursor-pointer items-center justify-between gap-4 rounded-2xl border px-5 text-left transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50', blocks.length ? 'border-rose-400/30 bg-rose-500/15 hover:bg-rose-500/25' : 'border-emerald-300/40 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 hover:brightness-110')}><span className="flex items-center gap-2"><Power className="h-6 w-6" /><b>POWER ON</b></span><ChevronRight className="h-5 w-5" /></button>
+              <button onClick={tryBoot} disabled={boot === 'checking' || sceneBusy || !guidedReady} className={cx('group flex min-h-14 min-w-52 cursor-pointer items-center justify-between gap-4 rounded-2xl border px-5 text-left transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-50', blocks.length ? 'border-rose-400/30 bg-rose-500/15 hover:bg-rose-500/25' : 'border-emerald-300/40 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 hover:brightness-110')}><span className="flex items-center gap-2"><Power className="h-6 w-6" /><b>{guidedReady ? 'POWER ON' : 'ทำรายการประกอบให้ครบ'}</b></span><ChevronRight className="h-5 w-5" /></button>
             </div>
             <details className="group mt-3 rounded-2xl border border-white/10 bg-white/[.03]">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-bold text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300">รายละเอียดระบบและลำดับประกอบ <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" /></summary>
@@ -309,6 +381,22 @@ function SceneLoading() {
   );
 }
 
+function CaseScrewPanel({ removed, onRemove }: { removed: number[]; onRemove: (screw: number) => void }) {
+  const points = ['มุมบนซ้าย', 'มุมบนขวา', 'มุมล่างซ้าย', 'มุมล่างขวา'];
+  return <div className="w-full max-w-md rounded-3xl border border-cyan-300/20 bg-[#0b1524] p-4 shadow-2xl sm:p-6">
+    <div className="text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-cyan-300/10 text-cyan-200"><Wrench className="h-6 w-6" /></div><p className="mt-3 text-[10px] font-black tracking-[.2em] text-cyan-300">STEP 01 · OPEN THE CASE</p><h3 className="font-display text-xl font-bold text-white">เริ่มจากไขน็อตฝาเคส</h3><p className="mt-1 text-sm text-slate-400">แตะน็อตทั้ง 4 จุดเพื่อคลายฝาข้าง ก่อนหยิบอะไหล่ลงติดตั้ง</p></div>
+    <div className="mx-auto mt-5 grid max-w-[240px] grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-gradient-to-br from-slate-700 to-slate-950 p-4 shadow-inner">
+      {points.map((point, index) => {
+        const isRemoved = removed.includes(index);
+        return <motion.button key={point} type="button" aria-label={isRemoved ? `${point} คลายแล้ว` : `คลายน็อต${point}`} aria-pressed={isRemoved} onClick={() => onRemove(index)} animate={{ rotate: isRemoved ? 180 : 0, opacity: isRemoved ? 0.35 : 1 }} transition={{ duration: 0.28 }} className={cx('grid min-h-16 place-items-center rounded-xl border transition', isRemoved ? 'border-emerald-300/20 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-black/25 text-amber-200 hover:border-amber-200/40 hover:bg-amber-200/10')}>
+          {isRemoved ? <Check className="h-5 w-5" /> : <Wrench className="h-5 w-5" />}<span className="text-[10px] font-bold">{point}</span>
+        </motion.button>;
+      })}
+    </div>
+    <div className="mt-4 flex items-center justify-between text-xs"><span className="text-slate-400">คลายน็อตแล้ว</span><b className="font-mono text-cyan-200">{removed.length}/4</b></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-black/40"><motion.div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-300" animate={{ width: `${removed.length * 25}%` }} /></div>
+  </div>;
+}
+
 function SceneFallback({ onSwitch }: { onSwitch: () => void }) {
   return (
     <div className="grid h-[560px] place-items-center rounded-[1.75rem] border border-amber-300/20 bg-[#050912] p-6 text-center sm:h-[620px]" role="alert">
@@ -317,7 +405,7 @@ function SceneFallback({ onSwitch }: { onSwitch: () => void }) {
   );
 }
 
-function BuildGrid({ build, selected, issues, onInstall, onRemove }: { build: Build; selected: PcPart | null; issues: ReturnType<typeof checkBuild>; onInstall: (category: PartCategory) => void; onRemove: (category: PartCategory) => void }) {
+function BuildGrid({ build, selected, issues, fixedCategories = [], onInstall, onRemove }: { build: Build; selected: PcPart | null; issues: ReturnType<typeof checkBuild>; fixedCategories?: PartCategory[]; onInstall: (category: PartCategory) => void; onRemove: (category: PartCategory) => void }) {
   return (
     <div className="relative mx-auto max-w-[720px] rounded-[2rem] border-[3px] border-slate-500/50 bg-[#111827] p-3 shadow-[inset_0_0_0_5px_#070b13,0_0_50px_rgba(34,211,238,.08)] sm:p-5">
       <div className="mb-3 flex items-center justify-between rounded-xl bg-black/35 px-3 py-2 text-[11px] font-bold tracking-wider text-slate-500">
@@ -326,7 +414,7 @@ function BuildGrid({ build, selected, issues, onInstall, onRemove }: { build: Bu
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:grid-rows-3">
         {CATEGORY_ORDER.map((item) => (
-          <BuildSlot key={item} category={item} part={build[item]} selected={selected?.category === item} issue={issues.some((issue) => issue.severity === 'block' && issue.categories.includes(item))} onInstall={() => onInstall(item)} onRemove={() => onRemove(item)} />
+          <BuildSlot key={item} category={item} part={build[item]} selected={selected?.category === item} issue={issues.some((issue) => issue.severity === 'block' && issue.categories.includes(item))} fixed={fixedCategories.includes(item)} onInstall={() => onInstall(item)} onRemove={() => onRemove(item)} />
         ))}
       </div>
     </div>
@@ -349,7 +437,7 @@ function PartCard({ part, selected, installed, disabled, index, onSelect, onDrag
   );
 }
 
-function BuildSlot({ category, part, selected, issue, onInstall, onRemove }: { category: PartCategory; part?: PcPart; selected: boolean; issue: boolean; onInstall: () => void; onRemove: () => void }) {
+function BuildSlot({ category, part, selected, issue, fixed, onInstall, onRemove }: { category: PartCategory; part?: PcPart; selected: boolean; issue: boolean; fixed: boolean; onInstall: () => void; onRemove: () => void }) {
   const Icon = ICONS[category];
   const span = category === 'motherboard' ? 'sm:col-span-2 sm:row-span-2' : category === 'case' ? 'sm:col-span-2' : '';
   return (
@@ -357,7 +445,7 @@ function BuildSlot({ category, part, selected, issue, onInstall, onRemove }: { c
       {part ? <>
         <div className="absolute inset-0 opacity-10" style={{ background: 'radial-gradient(circle at 70% 20%,' + part.color + ',transparent 45%)' }} />
         <span className="relative flex h-full flex-col"><Icon className="h-7 w-7" style={{ color: part.color }} /><b className="mt-auto block text-sm">{part.name}</b><small className="block truncate text-[10px] text-slate-400">{part.series}</small></span>
-        <button onClick={(event) => { event.stopPropagation(); onRemove(); }} className="absolute right-2 top-2 grid h-8 w-8 cursor-pointer place-items-center rounded-lg bg-black/40 text-slate-300 transition hover:text-white sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" aria-label={'ถอด ' + part.name}><X className="h-4 w-4" /></button>
+          {!fixed && <button onClick={(event) => { event.stopPropagation(); onRemove(); }} className="absolute right-2 top-2 grid h-8 w-8 cursor-pointer place-items-center rounded-lg bg-black/40 text-slate-300 transition hover:text-white sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100" aria-label={'ถอด ' + part.name}><X className="h-4 w-4" /></button>}
       </> : <span className="flex h-full flex-col items-center justify-center text-center"><Icon className={cx('h-6 w-6', selected ? 'text-cyan-300' : 'text-slate-600')} /><b className={cx('mt-1 text-xs', selected ? 'text-cyan-200' : 'text-slate-500')}>{selected ? 'แตะเพื่อติดตั้ง' : CATEGORY_LABELS[category].en}</b></span>}
     </motion.div>
   );

@@ -11,11 +11,11 @@ export function cx(...c: (string | false | null | undefined)[]) {
 type Variant = 'primary' | 'secondary' | 'ghost' | 'success' | 'danger';
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/25 hover:brightness-110',
-  secondary: 'bg-white text-slate-800 ring-1 ring-slate-200 shadow-sm hover:bg-slate-50',
-  ghost: 'text-slate-600 hover:bg-slate-100',
-  success: 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-500',
-  danger: 'bg-rose-600 text-white hover:bg-rose-500',
+  primary: 'bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 text-white shadow-[0_8px_20px_-8px_rgba(8,145,178,.65)] hover:brightness-110 hover:shadow-lg',
+  secondary: 'bg-white text-slate-800 ring-1 ring-slate-200 shadow-sm hover:bg-cyan-50 hover:ring-cyan-300',
+  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+  success: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20 hover:brightness-110',
+  danger: 'bg-rose-600 text-white shadow-md shadow-rose-600/20 hover:bg-rose-500',
 };
 
 export function Btn({ variant = 'primary', className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
@@ -23,8 +23,8 @@ export function Btn({ variant = 'primary', className, children, ...rest }: Butto
     <button
       {...rest}
       className={cx(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-5 py-2.5 font-semibold transition active:scale-[0.97]',
-        'focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-indigo-500',
+        'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 font-bold transition duration-200 active:translate-y-px',
+        'focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
         'disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:active:scale-100',
         VARIANTS[variant],
         className,
@@ -36,7 +36,7 @@ export function Btn({ variant = 'primary', className, children, ...rest }: Butto
 }
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx('rounded-3xl bg-white p-5 shadow-[0_8px_30px_-12px_rgba(30,41,99,0.18)] ring-1 ring-slate-100', className)}>{children}</div>;
+  return <div className={cx('rounded-2xl border border-white/90 bg-white/95 p-5 shadow-[0_16px_40px_-28px_rgba(15,39,68,.45)] ring-1 ring-slate-200/70 backdrop-blur-sm', className)}>{children}</div>;
 }
 
 export function CatPill({ cat, className }: { cat: Category; className?: string }) {
@@ -81,7 +81,7 @@ export function Feedback({ kind, children, title, className }: { kind: FeedbackK
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1, x: kind === 'incorrect' ? [0, -6, 6, -3, 3, 0] : 0 }}
       transition={{ duration: 0.35 }}
-      className={cx('flex gap-3 rounded-2xl p-4 ring-1', f.cls, className)}
+      className={cx('flex gap-3 rounded-2xl border p-4 shadow-sm ring-1 ring-inset', f.cls, className)}
     >
       <f.Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
       <div className="min-w-0">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowRight, CircleCheck, CircleX, Power, TriangleAlert } from 'lucide-react';
 import type { Category } from '../types';
@@ -11,6 +11,7 @@ import { useBuddyTopic } from '../components/Buddy';
 import { MissionComplete, MissionFrame, clamp, independence } from './common';
 import { useMissionHints } from './useMissionHints';
 import { Quiz } from './Quiz';
+const Mission2DeviceScene = lazy(() => import('../components/Mission2DeviceScene').then((module) => ({ default: module.Mission2DeviceScene })));
 
 interface Part {
   id: string;
@@ -32,6 +33,17 @@ const PARTS: Part[] = [
   { id: 'router', en: 'Router', icon: 'router', cat: 'communication', failure: 'NETWORK DOWN', effect: 'เข้าอินเทอร์เน็ตไม่ได้ ส่งไฟล์ให้เครื่องอื่นไม่ได้' },
 ];
 
+const PART_PURPOSE: Record<string, string> = {
+  keyboard: 'รับข้อมูลและคำสั่งจากผู้ใช้ผ่านการกดปุ่ม (อุปกรณ์ Input)',
+  mouse: 'รับการคลิกและการเคลื่อนไหวของผู้ใช้เข้าสู่คอมพิวเตอร์ (Input)',
+  cpu: 'ประมวลผลคำสั่งและคำนวณการทำงานของโปรแกรม (Processing)',
+  ram: 'พักข้อมูลที่กำลังใช้งาน เพื่อให้ CPU เรียกใช้ได้รวดเร็ว (Processing)',
+  ssd: 'เก็บระบบปฏิบัติการ โปรแกรม และไฟล์ไว้แม้ปิดเครื่อง (Storage)',
+  monitor: 'แสดงภาพและผลลัพธ์จากคอมพิวเตอร์ให้ผู้ใช้เห็น (Output)',
+  speaker: 'แปลงสัญญาณเสียงจากคอมพิวเตอร์เป็นเสียงที่ได้ยิน (Output)',
+  router: 'รับส่งข้อมูลระหว่างคอมพิวเตอร์กับเครือข่าย (Communication)',
+};
+
 const CASES = [
   { ticket: 'ผู้ใช้แจ้ง: "เปิดเครื่องแล้วขึ้นข้อความ No bootable device หาไฟล์งานไม่เจอเลย"', answer: 'ssd', fb: 'Storage เก็บระบบปฏิบัติการและไฟล์ — ถ้าไม่มี เครื่องจะหาอะไรมาเริ่มทำงานไม่ได้' },
   { ticket: 'ผู้ใช้แจ้ง: "เครื่องเปิดอยู่ ไฟติด พัดลมหมุน แต่ไม่เห็นอะไรเลย"', answer: 'monitor', fb: 'Monitor เป็นอุปกรณ์ Output ถ้าขาดไป งานทั้งหมดที่ทำก็ไม่มีใครเห็น' },
@@ -47,6 +59,8 @@ export function Mission2() {
   const [tested, setTested] = useState<string[]>([]);
   const [last, setLast] = useState<Part | null>(null);
   const [focusedId, setFocusedId] = useState<string>('cpu');
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [deviceMode, setDeviceMode] = useState<'assembled' | 'disassembly'>('assembled');
   const [phase, setPhase] = useState<'lab' | 'diagnose' | 'conclude' | 'done'>('lab');
   const [fb, setFb] = useState<{ kind: FeedbackKind; text: string } | null>(null);
   const [caseIdx, setCaseIdx] = useState(0);
@@ -59,6 +73,7 @@ export function Mission2() {
   const down = useMemo(() => new Set(PARTS.filter((p) => removed.includes(p.id)).map((p) => p.cat)), [removed]);
   const systemOk = removed.length === 0;
   const cpuGone = removed.includes('cpu');
+  const exploded = deviceMode === 'disassembly';
 
   useBuddyTopic(
     phase === 'lab'
@@ -95,6 +110,18 @@ export function Mission2() {
       }
     } else setLast(null);
     setFb(null);
+  };
+
+  const focusPart = (id: string) => {
+    setFocusedId(id);
+    setPickedId(null);
+    setDeviceMode('assembled');
+    setFb(null);
+  };
+
+  const changeDeviceMode = (mode: 'assembled' | 'disassembly') => {
+    setDeviceMode(mode);
+    setPickedId(mode === 'disassembly' ? focusedId : null);
   };
 
   const pickCase = (id: string) => {
@@ -151,7 +178,7 @@ export function Mission2() {
       {phase === 'lab' && (
         <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
-            <WorkbenchScene parts={PARTS} removed={removed} tested={tested} focusedId={focusedId} onFocus={setFocusedId} onDrop={toggle} />
+            <WorkbenchScene parts={PARTS} removed={removed} tested={tested} focusedId={focusedId} picked={pickedId === focusedId} exploded={exploded} deviceMode={deviceMode} onDeviceMode={changeDeviceMode} onFocus={focusPart} />
           </div>
           <div className="space-y-4">
             {(() => {
@@ -168,8 +195,8 @@ export function Mission2() {
                   <p className="text-[10px] font-black tracking-[.18em] text-indigo-500">PART INSPECTOR</p>
                   <h3 className="mt-1 font-display text-lg font-bold text-slate-900">{focused.en}</h3>
                   <p className={cx('mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold', c.soft, c.text)}>{c.en} · {off ? 'removed' : 'installed'}</p>
-                  <p className="mt-3 min-h-12 text-sm leading-relaxed text-slate-600">{off ? focused.effect : `ทำงานในกลุ่ม ${c.en} — ลองหยิบออกเพื่อดูผลกระทบที่เกิดกับเครื่อง`}</p>
-                  <button onClick={() => toggle(focused)} className="mt-3 min-h-11 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-indigo-700 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">{off ? 'ใส่ชิ้นส่วนกลับเข้าที่' : 'ถอดชิ้นส่วนออกมาทดสอบ'}</button>
+                  <p className="mt-3 min-h-12 text-sm leading-relaxed text-slate-600"><b>หน้าที่:</b> {PART_PURPOSE[focused.id]}{off && <><br /><b>เมื่อถอดออก:</b> {focused.effect}</>}</p>
+                  <button onClick={() => { if (off) { toggle(focused); setPickedId(null); changeDeviceMode('assembled'); } else if (deviceMode === 'assembled' && pickedId !== focused.id) setPickedId(focused.id); else if (deviceMode === 'assembled') changeDeviceMode('disassembly'); else { toggle(focused); setPickedId(null); changeDeviceMode('assembled'); } }} className="mt-3 min-h-11 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-indigo-700 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">{off ? 'ประกอบกลับเข้าระบบ' : deviceMode === 'disassembly' ? 'ทดลองถอดจากระบบ' : pickedId !== focused.id ? 'หยิบอุปกรณ์ขึ้นมาตรวจ' : 'เปิดโหมดแยกชิ้นส่วน'}</button>
                 </div>
               </div>;
             })()}
@@ -286,7 +313,7 @@ export function Mission2() {
   );
 }
 
-function WorkbenchScene({ parts, removed, tested, focusedId, onFocus, onDrop }: {
+function LegacyWorkbenchScene({ parts, removed, tested, focusedId, onFocus, onDrop }: {
   parts: Part[]; removed: string[]; tested: string[]; focusedId: string;
   onFocus: (id: string) => void; onDrop: (part: Part) => void;
 }) {
@@ -373,5 +400,36 @@ function WorkbenchScene({ parts, removed, tested, focusedId, onFocus, onDrop }: 
     </div>
     <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white/5 px-3 py-2 text-xs text-slate-300"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-cyan-300/15 text-cyan-200"><Ico name="hand" className="h-4 w-4" /></span><span><b className="text-white">จับชิ้นส่วน:</b> กดค้างแล้วลากไปยังอีกพื้นที่ · แตะเพื่อเลือกดูใกล้ ๆ · ใช้ปุ่ม PART INSPECTOR เพื่อถอด/ใส่ได้เช่นกัน</span></div>
     {dragged && <div className="pointer-events-none fixed z-[100] -translate-x-1/2 -translate-y-1/2 rounded-2xl border-2 border-cyan-300 bg-slate-950/90 p-2 shadow-[0_18px_45px_rgba(0,0,0,.55)]" style={{ left: held!.x, top: held!.y }} aria-hidden="true"><span className="grid h-16 w-20 place-items-center">{hasArt(dragged.id) ? <HardwareArt art={dragged.id} title={dragged.en} className="h-14 w-full" /> : <Ico name={dragged.icon} className="h-10 w-10 text-white" />}</span><span className="block text-center text-[10px] font-black text-white">{dragged.en}</span></div>}
+  </section>;
+}
+
+function WorkbenchScene({ parts, removed, tested, focusedId, picked, exploded, deviceMode, onDeviceMode, onFocus }: {
+  parts: Part[]; removed: string[]; tested: string[]; focusedId: string; picked: boolean; exploded: boolean; deviceMode: 'assembled' | 'disassembly';
+  onDeviceMode: (mode: 'assembled' | 'disassembly') => void; onFocus: (id: string) => void;
+}) {
+  const selected = parts.find((part) => part.id === focusedId) ?? parts[0];
+  return <section className="overflow-hidden rounded-[1.75rem] bg-[#0a1220] p-3 shadow-2xl ring-1 ring-slate-800 sm:p-4" aria-label="3D device exploration workshop">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+      <div><p className="text-[10px] font-black tracking-[.22em] text-cyan-300">GARAGE 02 / COMPONENT LAB</p><h2 className="font-display text-lg font-extrabold text-white">สำรวจอุปกรณ์ 3D</h2></div>
+      <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-bold tracking-widest text-emerald-200">หยิบ · หมุน · แยกชิ้นส่วน</span>
+    </div>
+    <div className="mb-3 flex gap-2 rounded-2xl border border-white/10 bg-slate-950/60 p-1.5" role="group" aria-label="เลือกโหมดสำรวจอุปกรณ์">
+      {(['assembled', 'disassembly'] as const).map((mode) => <button key={mode} type="button" aria-pressed={deviceMode === mode} onClick={() => onDeviceMode(mode)} className={cx('min-h-11 flex-1 rounded-xl px-3 py-2 text-sm font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200', deviceMode === mode ? 'bg-cyan-300 text-slate-950 shadow-lg' : 'text-slate-300 hover:bg-white/10 hover:text-white')}>
+        {mode === 'assembled' ? 'โหมดประกอบ' : 'โหมดแยกชิ้นส่วน'}
+      </button>)}
+    </div>
+    <Suspense fallback={<div className="grid h-[300px] place-items-center rounded-[1.5rem] bg-slate-900 text-sm font-bold text-cyan-200 sm:h-[390px]">กำลังเตรียมโต๊ะ 3D…</div>}>
+      <Mission2DeviceScene device={selected.id as 'keyboard' | 'mouse' | 'cpu' | 'ram' | 'ssd' | 'monitor' | 'speaker' | 'router'} picked={picked} exploded={exploded} />
+    </Suspense>
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {parts.map((part) => {
+        const active = focusedId === part.id;
+        const isRemoved = removed.includes(part.id);
+        return <button type="button" key={part.id} onClick={() => onFocus(part.id)} aria-pressed={active} className={cx('flex min-h-12 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-xs font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300', active ? 'border-cyan-300 bg-cyan-300/15 text-white' : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/25 hover:bg-white/10')}>
+          <span className="truncate">{part.en}</span><span className={cx('shrink-0 rounded-full px-1.5 py-0.5 text-[9px]', isRemoved ? 'bg-amber-300 text-slate-950' : 'bg-emerald-300/15 text-emerald-200')}>{isRemoved ? 'ถอดแล้ว' : tested.includes(part.id) ? 'สำรวจแล้ว' : 'ติดตั้ง'}</span>
+        </button>;
+      })}
+    </div>
+    <div className="mt-3 rounded-2xl bg-white/5 p-3 text-xs leading-relaxed text-slate-300">เลือกอุปกรณ์ แล้วกดปุ่มในแผง <b className="text-white">Part Inspector</b> เพื่อหยิบและแยกดูชิ้นส่วน · ลากเมาส์เพื่อหมุน · เลื่อนเพื่อซูม</div>
   </section>;
 }

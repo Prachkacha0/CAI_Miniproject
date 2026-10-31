@@ -34,9 +34,9 @@ export const MISSIONS: MissionMeta[] = [
     skill: 'ถอด/ใส่อุปกรณ์ · อ่านอาการ · ช่วยผู้ใช้แก้ปัญหา', reward: 'บันทึกผลการทดลอง', icon: 'power', accent: 'from-violet-500 to-fuchsia-400',
   },
   {
-    id: 3, code: 'M-03', title: 'ตามรอยเส้นทางข้อมูล', en: 'Trace the Data Route',
-    objective: 'ลากอุปกรณ์เข้ากลุ่ม Input, Processing, Storage, Output และ Communication จากนั้นเรียงเส้นทางข้อมูลให้ระบบกลับมาทำงาน', lo: 2, gameplay: 'จัดทีมอุปกรณ์ · ต่อสายข้อมูล',
-    skill: 'จัดประเภท · ต่อเส้นทาง · ทดลองรันระบบ', reward: 'เส้นทางข้อมูลสมบูรณ์', icon: 'route', accent: 'from-amber-500 to-orange-400',
+    id: 3, code: 'M-03', title: 'ปกป้อง Data Core', en: 'Data Core Defense',
+    objective: 'อ่านหน้าที่ของอุปกรณ์ที่สุ่มเข้ามา แล้วจำแนกเป็น Input, Processing, Storage, Output หรือ Communication ให้ถูกต้องเพื่อฟื้นระบบศูนย์ข้อมูล', lo: 2, gameplay: 'จัดหมวด 10 รอบ · ทำคอมโบ · ฟื้น Data Core',
+    skill: 'จำแนกตามลักษณะการทำงาน · อธิบายเหตุผล · เชื่อมโยงเส้นทางข้อมูล', reward: 'Badge: Hardware Sorter', icon: 'route', accent: 'from-cyan-500 to-blue-500',
   },
   {
     id: 4, code: 'M-04', title: 'ใครทำหน้าที่อะไร?', en: 'Who Does What?',
