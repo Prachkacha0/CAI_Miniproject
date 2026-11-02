@@ -39,6 +39,8 @@ Mission 6, the customer order stage, is now connected to M-07 PC assembly:
 11. A successful boot sets `builderCompleted`; progression then continues to the Final Case.
 12. The 3D case displays its side panel and screw heads until it is opened.
 
+AI Buddy now also has a real chat mode backed by Typhoon. The API key remains on the server through a Vercel Function at `api/ai-chat.ts`; local Vite development exposes the same endpoint. Configuration instructions are in `AI_BUDDY_SETUP.md`.
+
 Primary files for this feature:
 
 - `src/missions/Mission6.tsx`
