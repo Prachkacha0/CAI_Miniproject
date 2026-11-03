@@ -38,6 +38,7 @@ Do not create a `VITE_TYPHOON_API_KEY` variable. Variables beginning with `VITE_
 
 - AI Buddy answers in Thai and receives the current mission context.
 - It gives guided hints for assessment activities instead of direct answers.
+- If the Typhoon key is missing or the upstream API is temporarily unavailable, it automatically uses the built-in hardware guide so students can continue learning. It returns to Typhoon automatically when the API is available.
 - The client sends at most ten recent messages; each user message is limited to 600 characters.
 - The server validates input, accepts same-origin requests, applies limits per browser and per shared IP, hides upstream error details, and stops requests after 25 seconds.
-- When the key is missing, the UI reports that the server has not been configured instead of failing silently.
+- The fallback response identifies itself with the model name `hardware-quest-offline-guide`, making it easy to distinguish from a Typhoon response during testing.
